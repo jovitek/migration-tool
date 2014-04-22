@@ -1,0 +1,68 @@
+$: << File.expand_path(File.dirname(File.realpath(__FILE__)) + '/../lib')
+require "rubygems"
+require "bundler/setup"
+require "gli"
+require "migration"
+require "json"
+require "pp"
+require "csv"
+require "fileutils"
+require "logger"
+require "gooddata"
+
+include GLI::App
+
+program_desc 'Program for project migration'
+
+
+desc "Debug output to STDOUT"
+switch [:d,:debug]
+
+desc 'Migrate project'
+command :start do |c|
+
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      migration.load_data
+      migration.get_export_tokens_projects
+      migration.create_projects
+      migration.import_projects
+      migration.execute_maql
+      migration.execute_partial
+      migration.create_integration
+      migration.create_endpoint
+      migration.run_integration
+      migration.print_status
+  end
+end
+
+
+pre do |global,command,options,args|
+  next true if command.nil?
+  $log = Logger.new("log/migration.log",'daily') if !global[:debug]
+  $log = Logger.new(STDOUT) if global[:debug]
+  $log.level = Logger::INFO
+  true
+end
+
+on_error do |exception|
+  $log ||= Logger.new(STDOUT)
+  $log.level = Logger::DEBUG
+  $log.error exception.backtrace
+  if exception.is_a?(SystemExit) && exception.status == 0
+    $log.error exception.inspect
+    false
+  else
+    $log.error exception.inspect
+    false
+  end
+end
+
+
+
+
+exit run(ARGV)
+
+
+
+
