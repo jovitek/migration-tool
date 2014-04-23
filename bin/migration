@@ -32,6 +32,7 @@ command :start do |c|
       migration.create_integration
       migration.create_endpoint
       migration.run_integration
+      migration.apply_color_template
       migration.print_status
   end
 end
