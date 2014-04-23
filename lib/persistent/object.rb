@@ -62,6 +62,13 @@ module Migration
       "ENDPOINT_SET"
     end
 
+
+    def self.ENDPOINT_SET_FINISHED
+      "ENDPOINT_SET_FINISHED"
+    end
+
+
+
     def self.FINISHED
       "FINISHED"
     end

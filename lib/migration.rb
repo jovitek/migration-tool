@@ -31,6 +31,7 @@ module Migration
         @settings_import_token = json["settings"]["import_token"]
         @settings_project_file = json["settings"]["project_file"]
         @settings_project_template = json["settings"]["project_template"]
+        @settings_color_palete = json["settings"]["color_palete"] || nil
       end
       GoodData.logger = $log
       GoodData.logger.level = Logger::DEBUG
@@ -539,7 +540,7 @@ module Migration
           }
           begin
             result = GoodData.post("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/processes", json)
-            object.status = Object.FINISHED
+            object.status = Object.ENDPOINT_SET_FINISHED
             object.zendesk_sync_process = result["uri"]
             Storage.store_data
           rescue RestClient::BadRequest => e
@@ -553,6 +554,31 @@ module Migration
             response = JSON.load(e.response)
             $log.error "Unknown error - The zendesk process for project #{object.new_project_pid} could not be started and returned 500. Reason: #{response["message"]}"
           end
+        end
+      end
+    end
+
+
+    def apply_color_template
+      Storage.object_collection.each do |object|
+        if (object.status == Object.ENDPOINT_SET_FINISHED and !@settings_color_palete.nil?)
+          begin
+            result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
+            object.status = Object.FINISHED
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.error "Adding color palete to project #{object.new_project_pid} has failed. Reason: #{response["error"]["message"]}"
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.error "Adding color palete to project #{object.new_project_pid} has failed. Returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.error "Unknown error - Adding color palete to project #{object.new_project_pid} has failed and returned 500. Reason: #{response["message"]}"
+          end
+        elsif (object.status == Object.ENDPOINT_SET_FINISHED and @settings_color_palete.nil?)
+          object.status = Object.FINISHED
+          Storage.store_data
         end
       end
     end
