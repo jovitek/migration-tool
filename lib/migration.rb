@@ -206,7 +206,7 @@ module Migration
           $log.info "Waiting till all created project are provisioned"
           Storage.get_objects_by_status(Object.PROVISIONING).each do |for_check|
             project_status = GoodData::Project[for_check.new_project_pid]
-            if (project_status.to_json['content']['state'] =~ /^(ENABLED)$/)
+            if (project_status.to_json['content']['state'] == "ENABLED")
               $log.info "Project #{for_check.new_project_pid} successfully provisioned"
               for_check.status = Object.CREATED
               Storage.store_data
@@ -230,7 +230,7 @@ module Migration
         $log.info "Waiting till all created project are provisioned"
         Storage.get_objects_by_status(Object.PROVISIONING).each do |for_check|
           project_status = GoodData::Project[for_check.new_project_pid]
-          if (project_status.to_json['content']['state'] =~ /^(ENABLED)$/)
+          if (project_status.to_json['content']['state'] == "ENABLED")
             $log.info "Project #{for_check.new_project_pid} successfully provisioned"
             for_check.status = Object.CREATED
             Storage.store_data
