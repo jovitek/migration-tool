@@ -206,12 +206,13 @@ module Migration
           $log.info "Waiting till all created project are provisioned"
           Storage.get_objects_by_status(Object.PROVISIONING).each do |for_check|
             project_status = GoodData::Project[for_check.new_project_pid]
-            if (project_status.to_json['content']['state'] == "ENABLED")
+            #pp project_status.to_json["project"]['content']['state']
+            if (project_status.state == :enabled)
               $log.info "Project #{for_check.new_project_pid} successfully provisioned"
               for_check.status = Object.CREATED
               Storage.store_data
-            elsif (project_status.to_json['content']['state'] =~ /^(DELETED|ARCHIVED)$/)
-              $log.info "Project #{for_check.new_project_pid} was not provisioned"
+            elsif (project_status.state == :deleted or project_status.state == :archived)
+              $log.error "Project #{for_check.new_project_pid} was not provisioned"
               for_check.status = Object.CLONED
               Storage.store_data
             end
@@ -230,12 +231,12 @@ module Migration
         $log.info "Waiting till all created project are provisioned"
         Storage.get_objects_by_status(Object.PROVISIONING).each do |for_check|
           project_status = GoodData::Project[for_check.new_project_pid]
-          if (project_status.to_json['content']['state'] == "ENABLED")
+          if (project_status.state == :enabled)
             $log.info "Project #{for_check.new_project_pid} successfully provisioned"
             for_check.status = Object.CREATED
             Storage.store_data
-          elsif (project_status.to_json['content']['state'] =~ /^(DELETED|ARCHIVED)$/)
-            $log.info "Project #{for_check.new_project_pid} was not provisioned"
+          elsif (project_status.state == :deleted or project_status.state == :archived)
+            $log.error "Project #{for_check.new_project_pid} was not provisioned"
             for_check.status = Object.CLONED
             Storage.store_data
           end
