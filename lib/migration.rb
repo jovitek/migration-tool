@@ -32,13 +32,13 @@ module Migration
         @settings_project_file = json["settings"]["project_file"]
         @settings_project_template = json["settings"]["project_template"]
         @settings_color_palete = json["settings"]["color_palete"] || nil
+        @settings_upload_files = json["settings"]["upload_files"]
       end
       GoodData.logger = $log
       GoodData.logger.level = Logger::DEBUG
       #GoodData.connect(@connection_username,@connection_password,{:webdav_server => @connection_webdav,:server => @connection_server})
       #GoodData.connect(@connection_username,@connection_password,@connection_server,{:webdav_server => @connection_webdav})
       Storage.load_data
-      load_source_data()
       Storage.store_data
     end
 
@@ -482,6 +482,7 @@ module Migration
     end
 
 
+
     def create_integration
       Storage.object_collection.each do |object|
         if (object.status == Object.PARTIAL)
@@ -610,6 +611,74 @@ module Migration
       $log.info "----------------------------------------------------"
     end
 
+
+
+    def upload_file(continue = false)
+      connect_for_work()
+      if (!continue)
+        # If we are not continuing, lets reset everything to beginning state
+        Storage.object_collection.each do |object|
+          object.uploads = []
+          object.upload_finished = false
+          @settings_upload_files.each do |file|
+            object.uploads << {"name" => file.keys.first,"path" => file.values.first, "status" => Object.UPLOAD_NEW}
+          end
+        end
+      end
+      @settings_upload_files.each do |file|
+        GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/"})
+      end
+
+      while (Storage.object_collection.find_all{|o| o.upload_finished == false}.count > 0)
+        Storage.object_collection.find_all{|o| o.upload_finished == false}.each do |object|
+          running_task = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_RUNNING}
+          if (running_task.nil?)
+            new_upload = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_NEW}
+            if (!new_upload.nil?)
+              json = {
+                      "pullIntegration" => "/#{new_upload["name"]}"
+                     }
+              begin
+                res = GoodData.post("/gdc/md/#{object.new_project_pid}/etl/pull", json)
+                new_upload["uri"] = res["pullTask"]["uri"]
+                new_upload["status"] = Object.UPLOAD_RUNNING
+                running_task = new_upload
+              rescue RestClient::BadRequest => e
+                new_upload["status"] = Object.UPLOAD_ERROR
+                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+              rescue RestClient::InternalServerError => e
+                new_upload["status"] = Object.UPLOAD_ERROR
+                response = JSON.load(e.response)
+                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+              rescue => e
+                new_upload["status"] = Object.UPLOAD_ERROR
+                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}.. Reason: Unknown reason"
+              end
+              Storage.store_data
+            else
+              object.upload_finished = true
+              Storage.store_data
+            end
+          end
+          if (!running_task.nil?)
+            begin
+              response = GoodData.get(running_task["uri"])
+              if (response["taskStatus"] == "OK" || response["taskStatus"] == "WARNING")
+                running_task["status"] = Object.UPLOAD_OK
+              elsif (response["taskStatus"] == "ERROR")
+                running_task["status"] = Object.UPLOAD_ERROR
+              end
+            rescue => e
+              running_task["status"] = Object.UPLOAD_ERROR
+              $log.warn "Upload of file #{running_task["name"]} has failed for project #{object.new_project_pid}. Reason: Unknown reason"
+            end
+            Storage.store_data
+          end
+        end
+        puts "sleeping beauty"
+        sleep(5)
+      end
+    end
 
 
 
