@@ -644,11 +644,12 @@ module Migration
                 new_upload["status"] = Object.UPLOAD_RUNNING
                 running_task = new_upload
               rescue RestClient::BadRequest => e
+                response = JSON.load(e.response)
                 new_upload["status"] = Object.UPLOAD_ERROR
                 $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
               rescue RestClient::InternalServerError => e
-                new_upload["status"] = Object.UPLOAD_ERROR
                 response = JSON.load(e.response)
+                new_upload["status"] = Object.UPLOAD_ERROR
                 $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
               rescue => e
                 new_upload["status"] = Object.UPLOAD_ERROR
