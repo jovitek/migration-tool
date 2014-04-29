@@ -675,7 +675,6 @@ module Migration
             Storage.store_data
           end
         end
-        puts "sleeping beauty"
         sleep(5)
       end
     end
