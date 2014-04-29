@@ -624,6 +624,13 @@ module Migration
             object.uploads << {"name" => file.keys.first,"path" => file.values.first, "status" => Object.UPLOAD_NEW}
           end
         end
+      else
+        Storage.object_collection.each do |object|
+          object.uploads.each do |upload|
+            upload["status"] = Object.UPLOAD_NEW
+          end
+          object.upload_finished = false
+        end
       end
       @settings_upload_files.each do |file|
         GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/"})

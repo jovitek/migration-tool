@@ -42,10 +42,13 @@ end
 desc 'Upload datasets'
 command :upload do |c|
 
+  desc "Continue"
+  switch [:c,:continue]
+
+
   c.action do |global_options,options,args|
     migration = Migration::MigrationTasks.new()
-    migration.upload_file
-
+    migration.upload_file(global[:continue])
   end
 end
 
