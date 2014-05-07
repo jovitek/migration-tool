@@ -3,7 +3,7 @@ module Migration
 
   class Object
 
-    attr_accessor :old_project_pid,:new_project_pid,:status,:export_token,:export_status_url,:token_validity,:title,:summary,:import_status_url,:maql_update_task_id,:partial_metadata_task_id,:zendesk_sync_process,:type,:upload_finished,:uploads
+    attr_accessor :old_project_pid,:new_project_pid,:status,:export_token,:export_status_url,:token_validity,:title,:summary,:import_status_url,:maql_update_task_id,:partial_metadata_task_id,:zendesk_sync_process,:type,:upload_finished,:uploads,:api_url
 
     def self.VALID_TYPES
       ["migration","template"]
@@ -37,6 +37,10 @@ module Migration
       "IMPORTED"
     end
 
+    def self.TAGGED
+      "TAGGED"
+    end
+
     def self.MAQL_REQUESTED
       "MAQL_REQUESTED"
     end
@@ -52,6 +56,11 @@ module Migration
 
     def self.PARTIAL
       "PARTIAL"
+    end
+
+
+    def self.USER_CREATED
+      "USER_CREATED"
     end
 
     def self.INTEGRATION_CREATED

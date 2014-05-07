@@ -28,8 +28,10 @@ command :start do |c|
       migration.get_export_tokens_projects
       migration.create_projects
       migration.import_projects
+      migration.tag_entities
       migration.execute_maql
       migration.execute_partial
+      migration.create_user
       migration.create_integration
       migration.create_endpoint
       migration.run_integration

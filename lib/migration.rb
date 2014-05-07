@@ -33,6 +33,9 @@ module Migration
         @settings_project_template = json["settings"]["project_template"]
         @settings_color_palete = json["settings"]["color_palete"] || nil
         @settings_upload_files = json["settings"]["upload_files"]
+        @settings_domain = json["settings"]["domain"]
+        @settings_user_to_add = json["settings"]["user_to_add"]
+
       end
       GoodData.logger = $log
       GoodData.logger.level = Logger::DEBUG
@@ -88,6 +91,10 @@ module Migration
           project = GoodData.get("/gdc/projects/#{object.old_project_pid}")
           object.title = project["project"]["meta"]["title"]
           object.summary = project["project"]["meta"]["summary"]
+
+          integration_setting = GoodData.get("/gdc/projects/#{object.old_project_pid}/connectors/zendesk3/integration/config/settings")
+          object.api_url = integration_setting["settings"]["apiUrl"]
+
           if (object.type == "migration")
             object.status = Object.NEW
           elsif (object.type == "template")
@@ -324,12 +331,31 @@ module Migration
       end
     end
 
+
+
+    def tag_entities
+      Storage.object_collection.each do |object|
+        if (object.status == Object.IMPORTED)
+          GoodData.with_project(object.new_project_pid) do |project|
+            metrics = GoodData::Metric[:all].map { |meta|  GoodData::Metric[meta['link']]}
+            metrics.map do |x|
+              x.tags =  x.tags + " migrated"
+              x.save
+            end
+          end
+          object.status = Object.TAGGED
+          Storage.store_data
+        end
+
+      end
+    end
+
     def execute_maql
 
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
-        if (object.status == Object.IMPORTED)
+        if (object.status == Object.TAGGED)
           $log.info "Starting maql execution on : #{object.new_project_pid}"
           maql = {
               "manage" => {
@@ -364,7 +390,7 @@ module Migration
                 for_check.status = Object.MAQL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.IMPORTED
+                for_check.status = Object.TAGGED
                 Storage.store_data
                 $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -389,7 +415,7 @@ module Migration
             for_check.status = Object.MAQL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.IMPORTED
+            for_check.status = Object.TAGGED
             Storage.store_data
             $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
@@ -483,9 +509,59 @@ module Migration
 
 
 
-    def create_integration
+    def create_user
+      fail "You need to specify Zendesk domain name" if @settings_domain.nil?
+      users = GoodData::Domain.list_users(@settings_domain)
+
+      pp @settings_user_to_add
+      user_entity = users.find{|u| u["login"] == @settings_user_to_add}
+
+      pp user_entity
       Storage.object_collection.each do |object|
         if (object.status == Object.PARTIAL)
+
+          #Get roles in current project
+          project = GoodData::Project[object.new_project_pid]
+          # lets find the connector role
+          connector_role = project.get_role_by_identifier("connectorsSystemRole")
+
+          json =
+              {
+                "user" => {
+                  "content" => {
+                      "status" => "ENABLED",
+                      "userRoles" =>["#{connector_role["url"]}"]
+                  },
+                  "links"   => {
+                      "self" => user_entity["links"]["self"]
+                  }
+              }
+              }
+
+          begin
+            GoodData.post("/gdc/projects/#{object.new_project_pid}/users",json)
+            object.status = Object.USER_CREATED
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.error "I could not add user to project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.error "I could not add user to project #{object.new_project_pid}. The API returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.error "Unknown error - I could not add user to project #{object.new_project_pid} and returned 500. Reason: #{response["message"]}"
+          end
+        end
+      end
+
+
+    end
+
+
+    def create_integration
+      Storage.object_collection.each do |object|
+        if (object.status == Object.USER_CREATED)
 
           json = {
               "integration" => {
@@ -519,7 +595,7 @@ module Migration
 
           json = {
               "settings" => {
-                 "apiUrl" => "https://gooddata.zendesk.com"
+                 "apiUrl" => object.api_url
             }
           }
           begin
