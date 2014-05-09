@@ -511,29 +511,33 @@ module Migration
 
     def create_user
       fail "You need to specify Zendesk domain name" if @settings_domain.nil?
-      users = GoodData::Domain.list_users(@settings_domain)
-
-      pp @settings_user_to_add
-      user_entity = users.find{|u| u["login"] == @settings_user_to_add}
-
-      pp user_entity
+      users = GoodData::Domain.users(@settings_domain)
+      user_entity = users.find{|u| u.login == @settings_user_to_add}
       Storage.object_collection.each do |object|
         if (object.status == Object.PARTIAL)
 
           #Get roles in current project
           project = GoodData::Project[object.new_project_pid]
           # lets find the connector role
-          connector_role = project.get_role_by_identifier("connectorsSystemRole")
-
+          roles = GoodData.get("/gdc/projects/#{object.new_project_pid}/roles")
+          connectorRoleUrl = ""
+          
+          roles["projectRoles"]["roles"].each do |role|
+            role_response = GoodData.get(role)
+            if (role_response["projectRole"]["meta"]["identifier"] == "connectorsSystemRole") 
+              connectorRoleUrl = role
+              break
+            end
+          end
           json =
               {
                 "user" => {
                   "content" => {
                       "status" => "ENABLED",
-                      "userRoles" =>["#{connector_role["url"]}"]
+                      "userRoles" =>["#{connectorRoleUrl}"]
                   },
                   "links"   => {
-                      "self" => user_entity["links"]["self"]
+                      "self" => user_entity.json['accountSetting']['links']['self']
                   }
               }
               }

@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/gooddata/gooddata-ruby.git
-  revision: 1c2b846c72bdad3feaf8713d249e3f8390e7673d
+  revision: 015cfd88d8aa6201b2d61b283e562b62219061a2
   specs:
     gooddata (0.6.0)
       activesupport (~> 4.1.0)
@@ -11,7 +11,7 @@ GIT
       highline (~> 1.6.21)
       i18n (~> 0.6.9)
       json_pure (~> 1.8.1)
-      multi_json (~> 1.9.0)
+      multi_json (~> 1.10.0)
       parseconfig (~> 1.0.4)
       pry (~> 0.9.12.6)
       rest-client (~> 1.6.7)
@@ -47,7 +47,7 @@ GEM
     method_source (0.8.2)
     mime-types (2.2)
     minitest (5.3.3)
-    multi_json (1.9.3)
+    multi_json (1.10.0)
     multi_xml (0.5.5)
     multipart-post (1.2.0)
     parseconfig (1.0.4)
