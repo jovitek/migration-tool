@@ -712,8 +712,10 @@ module Migration
           object.upload_finished = false
         end
       end
-      @settings_upload_files.each do |file|
-        GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/"})
+      Storage.object_collection.each do |object|
+        @settings_upload_files.each do |file|
+          GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
+        end
       end
 
       while (Storage.object_collection.find_all{|o| o.upload_finished == false}.count > 0)
@@ -723,7 +725,7 @@ module Migration
             new_upload = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_NEW}
             if (!new_upload.nil?)
               json = {
-                      "pullIntegration" => "/#{new_upload["name"]}"
+                      "pullIntegration" => "/#{object.new_project_pid}/#{new_upload["name"]}"
                      }
               begin
                 res = GoodData.post("/gdc/md/#{object.new_project_pid}/etl/pull", json)
