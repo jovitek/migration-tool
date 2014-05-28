@@ -35,6 +35,9 @@ module Migration
         @settings_upload_files = json["settings"]["upload_files"]
         @settings_domain = json["settings"]["domain"]
         @settings_user_to_add = json["settings"]["user_to_add"]
+        @settings_project_name_prefix = json["settings"]["project_name_prefix"]
+        @settings_project_name_postfix = json["settings"]["project_name_postfix"]
+        @settings_project_summary = json["settings"]["project_summary"]
 
       end
       GoodData.logger = $log
@@ -186,8 +189,8 @@ module Migration
               {
                   'project' => {
                       'meta' => {
-                          'title' => object.title + " v4",
-                          'summary' => object.summary
+                          'title' => @settings_project_name_prefix + object.title + @settings_project_name_postfix,
+                          'summary' => object.summary + @settings_project_summary
                       },
                       'content' => {
                           'guidedNavigation' => 1,
@@ -342,7 +345,44 @@ module Migration
               x.tags =  x.tags + " migrated"
               x.save
             end
+            
+            dashboards = GoodData::Dashboard[:all].map { |meta|  GoodData::Dashboard[meta['link']]}
+            dashboards.map do |x|
+              x.tags =  x.tags + " migrated"
+              x.save
+            end
           end
+          # tag reports in schedule email jobs
+          scheduledMails = GoodData.get('/gdc/md/' + object.new_project_pid + '/query/scheduledmails/')
+          scheduledMails["query"]["entries"].each { |x|
+            scheduleMail = GoodData.get(x["link"])
+            scheduleMail["scheduledMail"]["content"]["attachments"].each { |y|
+              if !y["reportAttachment"].nil?
+                # attachements are reports, tag each report
+                scheduledObject = GoodData.get(y["reportAttachment"]["uri"])
+                scheduledObject["report"]["meta"]["tags"] = scheduledObject["report"]["meta"]["tags"] + ' migratedSchedEmail'
+                GoodData.post(scheduledObject["report"]["meta"]["uri"], scheduledObject)
+              else !y["dashboardAttachment"].nil?
+                # attachments are dashboards
+                tabs = y["dashboardAttachment"]["tabs"]
+                scheduledObject = GoodData.get(y["dashboardAttachment"]["uri"])
+                # only tag reports in dashboard tabs that are scheduled
+                scheduledObject["projectDashboard"]["content"]["tabs"].each { |t|
+                  if tabs.include?(t["identifier"])
+                    t["items"].each { |i|
+                    # only tag reports
+                      if !i["reportItem"].nil?
+                        report = GoodData.get(i["reportItem"]["obj"])
+                        report["report"]["meta"]["tags"] = report["report"]["meta"]["tags"] + ' migratedSchedEmail'
+                        GoodData.post(report["report"]["meta"]["uri"], report)
+                      end
+                    }
+                  end
+                }
+              end
+            }
+          }
+
           object.status = Object.TAGGED
           Storage.store_data
         end
@@ -714,7 +754,10 @@ module Migration
       end
       Storage.object_collection.each do |object|
         @settings_upload_files.each do |file|
+          #puts 'upload start'
+          #GoodData.connection.upload(file.values.first,{:filename => "upload.zip",:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
           GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
+          #puts 'upload done'
         end
       end
 
