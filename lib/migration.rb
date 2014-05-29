@@ -367,17 +367,17 @@ module Migration
                 tabs = y["dashboardAttachment"]["tabs"]
                 scheduledObject = GoodData.get(y["dashboardAttachment"]["uri"])
                 # only tag reports in dashboard tabs that are scheduled
-                scheduledObject["projectDashboard"]["content"]["tabs"].each { |t|
-                  if tabs.include?(t["identifier"])
-                    t["items"].each { |i|
-                    # only tag reports
+                tabs.each { |t|
+                  scheduledObject["projectDashboard"]["content"]["tabs"].select { |dt| dt["identifier"] == t}.each { |st|
+                    st["items"].each { |i|
+                      # only tag reports
                       if !i["reportItem"].nil?
                         report = GoodData.get(i["reportItem"]["obj"])
                         report["report"]["meta"]["tags"] = report["report"]["meta"]["tags"] + ' migratedSchedEmail'
                         GoodData.post(report["report"]["meta"]["uri"], report)
                       end
                     }
-                  end
+                  }
                 }
               end
             }
@@ -754,10 +754,7 @@ module Migration
       end
       Storage.object_collection.each do |object|
         @settings_upload_files.each do |file|
-          #puts 'upload start'
-          #GoodData.connection.upload(file.values.first,{:filename => "upload.zip",:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
           GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
-          #puts 'upload done'
         end
       end
 
