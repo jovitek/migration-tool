@@ -811,8 +811,8 @@ module Migration
 
     def replace_satisfaction_values
       connect_for_work()
+      GoodData.project = object.new_project_pid
       Storage.object_collection.each do |object|
-        GoodData.project = object.new_project_pid
         satisfactionScore = GoodData::Attribute.find_first_by_title('Ticket Satisfaction Score')
         usedby = GoodData.get("/gdc/md/#{object.new_project_pid}/usedby2/5750")
         links = usedby["entries"].select do |x|
