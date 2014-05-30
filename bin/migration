@@ -36,6 +36,8 @@ command :start do |c|
       migration.create_endpoint
       migration.run_integration
       migration.apply_color_template
+      migration.upload_file(global_options[:continue])
+      migration.replace_satisfaction_values
       migration.print_status
   end
 end
@@ -51,6 +53,7 @@ command :upload do |c|
   c.action do |global_options,options,args|
     migration = Migration::MigrationTasks.new()
     migration.upload_file(global_options[:continue])
+    migration.replace_satisfaction_values
   end
 end
 
