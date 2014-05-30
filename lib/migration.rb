@@ -809,7 +809,25 @@ module Migration
       end
     end
 
+    def replace_satisfaction_values
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        GoodData.project = object.new_project_pid
+        satisfactionScore = GoodData::Attribute.find_first_by_title('Ticket Satisfaction Score')
+        usedby = GoodData.get("/gdc/md/#{object.new_project_pid}/usedby2/5750")
+        links = usedby["entries"].select do |x|
+          x["category"]=="metric"
+        end.select do |x|
+          x["link"]!="/gdc/md/#{object.new_project_pid}/obj/6349"
+        end.map { |x| x['link'] }
 
+        links.each { |x|
+          metric = GoodData::Metric[x]
+          metric.replace_value(satisfactionScore.primary_label, 'Not%20Offered', 'Unoffered')
+          metric.save
+        }
+      end
+    end
 
 
 
