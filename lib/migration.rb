@@ -829,9 +829,90 @@ module Migration
       end
     end
 
+    def swap_label_dash_filters ( options = {} )
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        project_pid = object.new_project_pid
+        label_from = ''
+        label_to = ''
 
+        GoodData.use project_pid
 
+        attr = GoodData::Attribute[options[:attribute]]
 
+        attr.labels.each { |x|
+
+          if x.meta["identifier"] == options[:label_from]
+
+            label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+          else if x.identifier == options[:label_to]
+              label_to = x.uri.gsub("/gdc/md/#{project_pid}/obj/","")
+            end
+          end
+        }
+
+        what = "/gdc/md/#{project_pid}/obj/#{label_from}"
+
+        dashboards = GoodData::Dashboard[:all]
+
+        dashboards.each { |x|
+          dd = GoodData::Dashboard[x["link"]]
+
+          dd.content["filters"].each { |x|
+
+            if x["filterItemContent"]["obj"] == what
+              puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
+              x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
+            end
+          }
+          dd.save
+        }
+      end
+    end
+
+    def swap_label_reports ( options = {} )
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        project_pid = object.new_project_pid
+        label_from = ''
+        label_to = ''
+
+        GoodData.use project_pid
+        attr = GoodData::Attribute[options[:attribute]]
+
+        attr.labels.each { |x|
+
+          if x.meta["identifier"] == options[:label_from]
+
+            label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+          else if x.meta["identifier"] == options[:label_to]
+              label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+            end
+          end
+        };
+
+        GoodData.with_project(project_pid) do |project|
+
+          linehash = {}
+
+          usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + label_from)
+          links = usedby["entries"].select do |x|
+            x["category"]=="reportDefinition"
+          end.map { |x| x['link'] }
+
+          definitions = links.map {|x| GoodData.get(x)}
+          what = "/gdc/md/#{project_pid}/obj/#{label_from}"
+
+          definitions.each { |x|
+            jj = JSON.generate(x).gsub(/\"#{what}\"/,"\"/gdc/md/#{project_pid}/obj/#{label_to}\"")
+
+            payload = JSON.parse(jj)
+
+            res = GoodData.put(x["reportDefinition"]["meta"]["uri"],payload)
+          };
+        end
+      end
+    end
 
 
 
