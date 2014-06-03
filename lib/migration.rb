@@ -1,5 +1,6 @@
 require "yaml"
 require "helper"
+require "time"
 %w(storage object).each {|a| require "persistent/#{a}"}
 
 
@@ -52,7 +53,6 @@ module Migration
 
 
     def connect_for_export()
-      pp "connecting"
       GoodData.connect(@connection_export_username,@connection_export_password,{:webdav_server => @connection_export_webdav,:server => @connection_export_server})
     end
 
@@ -67,6 +67,7 @@ module Migration
 
 
     def load_source_data
+      puts(Time.now.inspect  + " - loading source data from csv")
       fail "Project file don't exists" if !File.exists?(@settings_project_file)
       pids = []
       CSV.foreach(@settings_project_file, {:headers => true, :skip_blanks => true}) do |csv_obj|
@@ -88,6 +89,7 @@ module Migration
 
 
     def load_data
+      puts(Time.now.inspect + " - fetching connector settings from Z3 projects")
       connect_for_export()
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
@@ -109,6 +111,7 @@ module Migration
     end
 
     def get_export_tokens_projects
+      puts(Time.now.inspect  + " - exporting source projects for cloning")
       connect_for_export()
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
@@ -180,6 +183,7 @@ module Migration
 
 
     def create_projects
+      puts(Time.now.inspect  + " - creating target projects")
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.CLONED)
@@ -265,6 +269,7 @@ module Migration
 
 
     def import_projects
+      puts(Time.now.inspect  + " - importing clone tokens")
       Storage.object_collection.each do |object|
         if (object.status == Object.CREATED and object.type == "migration")
           $log.info "Starting import for project: #{object.old_project_pid} (new pid #{object.new_project_pid}"
@@ -337,6 +342,7 @@ module Migration
 
 
     def tag_entities
+      puts(Time.now.inspect  + " - tagging metrics")
       Storage.object_collection.each do |object|
         if (object.status == Object.IMPORTED)
           GoodData.with_project(object.new_project_pid) do |project|
@@ -391,7 +397,7 @@ module Migration
     end
 
     def execute_maql
-
+      puts(Time.now.inspect  + " - executing update maql")
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
@@ -470,6 +476,7 @@ module Migration
     end
 
     def execute_partial
+      puts (Time.now.inspect  + " - executing partial md import of the new dashboard")
       fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
       Storage.object_collection.each do |object|
         if (object.status == Object.MAQL)
@@ -550,6 +557,7 @@ module Migration
 
 
     def create_user
+      puts (Time.now.inspect  + " - creating connector users")
       fail "You need to specify Zendesk domain name" if @settings_domain.nil?
       users = GoodData::Domain.users(@settings_domain)
       user_entity = users.find{|u| u.login == @settings_user_to_add}
@@ -604,6 +612,7 @@ module Migration
 
 
     def create_integration
+      puts (Time.now.inspect  + " - creating ZD4 integrations")
       Storage.object_collection.each do |object|
         if (object.status == Object.USER_CREATED)
 
@@ -634,6 +643,7 @@ module Migration
 
 
     def create_endpoint
+      puts(Time.now.inspect  + " - setting up ZD4 integrations")
       Storage.object_collection.each do |object|
         if (object.status == Object.INTEGRATION_CREATED)
 
@@ -663,6 +673,7 @@ module Migration
 
 
     def run_integration
+      puts(Time.now.inspect  + " - kicking off the ZD4 integrations")
       Storage.object_collection.each do |object|
         if (object.status == Object.ENDPOINT_SET)
           json = {
@@ -690,6 +701,7 @@ module Migration
 
 
     def apply_color_template
+      puts(Time.now.inspect  + " - uploading custom colour palettes")
       Storage.object_collection.each do |object|
         if (object.status == Object.ENDPOINT_SET_FINISHED and !@settings_color_palete.nil?)
           begin
@@ -734,6 +746,7 @@ module Migration
 
 
     def upload_file(continue = false)
+      puts(Time.now.inspect  + " - uploading data to datasets")
       connect_for_work()
       if (!continue)
         # If we are not continuing, lets reset everything to beginning state
@@ -810,6 +823,7 @@ module Migration
     end
 
     def replace_satisfaction_values
+      puts(Time.now.inspect  + " - updating satisfaction metrics")
       connect_for_work()
       Storage.object_collection.each do |object|
         GoodData.project = object.new_project_pid
@@ -830,6 +844,7 @@ module Migration
     end
 
     def swap_label_dash_filters ( options = {} )
+      puts(Time.now.inspect  + " - swapping dashboard filters")
       connect_for_work()
       Storage.object_collection.each do |object|
         project_pid = object.new_project_pid
@@ -845,10 +860,11 @@ module Migration
           if x.meta["identifier"] == options[:label_from]
 
             label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-          else if x.identifier == options[:label_to]
-              label_to = x.uri.gsub("/gdc/md/#{project_pid}/obj/","")
-            end
           end
+          if x.identifier == options[:label_to]
+              label_to = x.uri.gsub("/gdc/md/#{project_pid}/obj/","")
+          end
+          
         }
 
         what = "/gdc/md/#{project_pid}/obj/#{label_from}"
@@ -861,7 +877,7 @@ module Migration
           dd.content["filters"].each { |x|
 
             if x["filterItemContent"]["obj"] == what
-              puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
+             # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
               x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
             end
           }
@@ -871,6 +887,7 @@ module Migration
     end
 
     def swap_label_reports ( options = {} )
+      puts(Time.now.inspect  + " - swapping labels in reports")
       connect_for_work()
       Storage.object_collection.each do |object|
         project_pid = object.new_project_pid
@@ -883,12 +900,13 @@ module Migration
         attr.labels.each { |x|
 
           if x.meta["identifier"] == options[:label_from]
-
-            label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-          else if x.meta["identifier"] == options[:label_to]
-              label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-            end
+             label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
           end
+          
+          if x.meta["identifier"] == options[:label_to]
+             label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+          end
+          
         };
 
         GoodData.with_project(project_pid) do |project|

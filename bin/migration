@@ -6,6 +6,7 @@ require "migration"
 require "json"
 require "pp"
 require "csv"
+require "time"
 require "fileutils"
 require "logger"
 require "gooddata"
@@ -23,6 +24,7 @@ command :start do |c|
 
   c.action do |global_options,options,args|
       migration = Migration::MigrationTasks.new()
+      puts Time.now.inspect + " - Migration job started"
       migration.load_source_data
       migration.load_data
       migration.get_export_tokens_projects
@@ -31,44 +33,48 @@ command :start do |c|
       migration.tag_entities
       migration.execute_maql
       migration.execute_partial
+      migration.apply_color_template
+      migration.upload_file(global_options[:continue])
+      
+      migration.swap_label_dash_filters(
+          {
+            :attribute => 'attr.zendesktickets.group',
+            :label_from => 'label.zendesktickets.group',
+            :label_to => 'label.zendesktickets.group.ticketgroupname'})
+      migration.swap_label_dash_filters(
+          {
+            :attribute => 'attr.zendesktickets.submitter',
+            :label_from => 'label.zendesktickets.submitter',
+            :label_to => 'label.zendesktickets.submitter.ticketsubmittername'})
+      migration.swap_label_dash_filters(
+          {
+            :attribute => 'attr.zendesktickets.assignee',
+            :label_from => 'label.zendesktickets.assignee',
+            :label_to => 'label.zendesktickets.assignee.ticketassigneename'})
+      migration.swap_label_reports(
+          {
+            :attribute => 'attr.zendesktickets.group',
+            :label_from => 'label.zendesktickets.group',
+            :label_to => 'label.zendesktickets.group.ticketgroupname'})
+      migration.swap_label_reports(
+          {
+            :attribute => 'attr.zendesktickets.submitter',
+            :label_from => 'label.zendesktickets.submitter',
+            :label_to => 'label.zendesktickets.submitter.ticketsubmittername'})
+      migration.swap_label_reports(
+          {
+            :attribute => 'attr.zendesktickets.assignee',
+            :label_from => 'label.zendesktickets.assignee',
+            :label_to => 'label.zendesktickets.assignee.ticketassigneename'})
+      migration.replace_satisfaction_values
+
       migration.create_user
       migration.create_integration
       migration.create_endpoint
       migration.run_integration
-      migration.apply_color_template
-      migration.swap_label_dash_filters(
-          {
-            :attribute => 'attr.zendesktickets.group',
-            :label_from => 'label.zendesktickets.group',
-            :label_to => 'label.zendesktickets.group.ticketgroupname'})
-      migration.swap_label_dash_filters(
-          {
-            :attribute => 'attr.zendesktickets.submitter',
-            :label_from => 'label.zendesktickets.submitter',
-            :label_to => 'label.zendesktickets.submitter.ticketsubmittername'})
-      migration.swap_label_dash_filters(
-          {
-            :attribute => 'attr.zendesktickets.assignee',
-            :label_from => 'label.zendesktickets.assignee',
-            :label_to => 'label.zendesktickets.assignee.ticketassigneename'})
-      migration.swap_label_reports(
-          {
-            :attribute => 'attr.zendesktickets.group',
-            :label_from => 'label.zendesktickets.group',
-            :label_to => 'label.zendesktickets.group.ticketgroupname'})
-      migration.swap_label_reports(
-          {
-            :attribute => 'attr.zendesktickets.submitter',
-            :label_from => 'label.zendesktickets.submitter',
-            :label_to => 'label.zendesktickets.submitter.ticketsubmittername'})
-      migration.swap_label_reports(
-          {
-            :attribute => 'attr.zendesktickets.assignee',
-            :label_from => 'label.zendesktickets.assignee',
-            :label_to => 'label.zendesktickets.assignee.ticketassigneename'})
-      migration.upload_file(global_options[:continue])
-      migration.replace_satisfaction_values
+      
       migration.print_status
+      puts Time.now.inspect + ' - Migraton job ended'
   end
 end
 
