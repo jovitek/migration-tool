@@ -39,6 +39,7 @@ module Migration
         @settings_project_name_prefix = json["settings"]["project_name_prefix"]
         @settings_project_name_postfix = json["settings"]["project_name_postfix"]
         @settings_project_summary = json["settings"]["project_summary"]
+        @settings_swap_config = json["settings"]["swap_config"]
 
       end
       GoodData.logger = $log
@@ -843,7 +844,7 @@ module Migration
       end
     end
 
-    def swap_label_dash_filters ( options = {} )
+    def swap_label_dash_filters
       puts(Time.now.inspect  + " - swapping dashboard filters")
       connect_for_work()
       Storage.object_collection.each do |object|
@@ -853,41 +854,44 @@ module Migration
 
         GoodData.use project_pid
 
-        attr = GoodData::Attribute[options[:attribute]]
-
-        attr.labels.each { |x|
-
-          if x.meta["identifier"] == options[:label_from]
-
-            label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-          end
-          if x.identifier == options[:label_to]
-              label_to = x.uri.gsub("/gdc/md/#{project_pid}/obj/","")
-          end
+        #start config loop here
+        @settings_swap_config.each { |s|
           
-        }
+          attr = GoodData::Attribute[s["attribute"]]
 
-        what = "/gdc/md/#{project_pid}/obj/#{label_from}"
+          attr.labels.each { |x|
 
-        dashboards = GoodData::Dashboard[:all]
+            if x.meta["identifier"] == s["label_from"]
 
-        dashboards.each { |x|
-          dd = GoodData::Dashboard[x["link"]]
-
-          dd.content["filters"].each { |x|
-
-            if x["filterItemContent"]["obj"] == what
-             # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
-              x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
+              label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+            end
+            if x.identifier == s["label_to"]
+              label_to = x.uri.gsub("/gdc/md/#{project_pid}/obj/","")
             end
           }
-          dd.save
+
+          what = "/gdc/md/#{project_pid}/obj/#{label_from}"
+
+          dashboards = GoodData::Dashboard[:all]
+
+          dashboards.each { |x|
+            dd = GoodData::Dashboard[x["link"]]
+
+            dd.content["filters"].each { |x|
+
+              if x["filterItemContent"]["obj"] == what
+                # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
+                x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
+              end
+            }
+            dd.save
+          }
         }
       end
     end
 
-    def swap_label_reports ( options = {} )
-      puts(Time.now.inspect  + " - swapping labels in reports")
+    def swap_labels
+      puts(Time.now.inspect  + " - swapping labels in reports and dashboards")
       connect_for_work()
       Storage.object_collection.each do |object|
         project_pid = object.new_project_pid
@@ -895,40 +899,108 @@ module Migration
         label_to = ''
 
         GoodData.use project_pid
-        attr = GoodData::Attribute[options[:attribute]]
 
-        attr.labels.each { |x|
+        #start config loop here
+        @settings_swap_config.each { |s|
 
-          if x.meta["identifier"] == options[:label_from]
-             label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-          end
-          
-          if x.meta["identifier"] == options[:label_to]
-             label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-          end
-          
-        };
+          attr = GoodData::Attribute[s["attribute"]]
 
-        GoodData.with_project(project_pid) do |project|
+          attr.labels.each { |x|
 
-          linehash = {}
+            if x.meta["identifier"] == s["label_from"]
+              label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+            end
 
-          usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + label_from)
-          links = usedby["entries"].select do |x|
-            x["category"]=="reportDefinition"
-          end.map { |x| x['link'] }
+            if x.meta["identifier"] == s["label_to"]
+              label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+            end
 
-          definitions = links.map {|x| GoodData.get(x)}
-          what = "/gdc/md/#{project_pid}/obj/#{label_from}"
-
-          definitions.each { |x|
-            jj = JSON.generate(x).gsub(/\"#{what}\"/,"\"/gdc/md/#{project_pid}/obj/#{label_to}\"")
-
-            payload = JSON.parse(jj)
-
-            res = GoodData.put(x["reportDefinition"]["meta"]["uri"],payload)
           };
-        end
+
+          GoodData.with_project(project_pid) do |project|
+
+            linehash = {}
+
+            usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + label_from)
+            links = usedby["entries"].select do |x|
+              x["category"]=="reportDefinition"
+            end.map { |x| x['link'] }
+
+            definitions = links.map {|x| GoodData.get(x)}
+            what = "/gdc/md/#{project_pid}/obj/#{label_from}"
+            whatPatt = /(\/gdc\/md\/#{project_pid}\/obj\/#{label_from})/
+
+            definitions.each { |x|
+              jj = JSON.generate(x).gsub(/\"#{what}\"/,"\"/gdc/md/#{project_pid}/obj/#{label_to}\"")
+
+              payload = JSON.parse(jj)
+
+              # tag reports which have label_from in filter
+              x["reportDefinition"]["content"]["filters"].each { |f|
+                if f["expression"] =~ whatPatt
+                  payload["reportDefinition"]["meta"]["tags"] = payload["reportDefinition"]["meta"]["tags"] + " migrationFixFilter"
+                end
+              }
+
+              res = GoodData.put(x["reportDefinition"]["meta"]["uri"],payload)
+            }
+
+            dashboards = GoodData::Dashboard[:all]
+
+            dashboards.each { |x|
+              dd = GoodData::Dashboard[x["link"]]
+
+              dd.content["filters"].each { |x|
+
+                if x["filterItemContent"]["obj"] == what
+                  # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
+                  x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
+                end
+              }
+              dd.save
+            }
+          end
+        }
+      end
+    end
+    
+    def rename_date_facts
+      puts(Time.now.inspect  + " - renaming date facts")
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        GoodData.project = object.new_project_pid
+        
+        create = GoodData::Fact["dt.zendesktickets.createdat"]
+        #create.identifier = "fact.zendesktickets.createdat"
+        #create.save
+        createObj = GoodData.get(create.uri)
+        createObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.createdat"
+        GoodData.put(create.uri, createObj)
+        
+        update = GoodData::Fact["dt.zendesktickets.updatedat"]
+        updateObj = GoodData.get(update.uri)
+        updateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.updatedat"
+        GoodData.put(update.uri, updateObj)
+        
+        assign = GoodData::Fact["dt.zendesktickets.assignedat"]
+        assignObj = GoodData.get(assign.uri)
+        assignObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.assignedat"
+        GoodData.put(assign.uri, assignObj)
+        
+        duedate = GoodData::Fact["dt.zendesktickets.duedate"]
+        duedateObj = GoodData.get(duedate.uri)
+        duedateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.duedate"
+        GoodData.put(duedate.uri, duedateObj)
+        
+        initiallyassignedat = GoodData::Fact["dt.zendesktickets.initiallyassignedat"]
+        initiallyassignedatObj = GoodData.get(initiallyassignedat.uri)
+        initiallyassignedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.initiallyassignedat"
+        GoodData.put(initiallyassignedat.uri, initiallyassignedatObj)
+        
+        solvedat = GoodData::Fact["dt.zendesktickets.solvedat"]
+        solvedatObj = GoodData.get(solvedat.uri)
+        solvedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.solvedat"
+        GoodData.put(solvedat.uri, solvedatObj)
       end
     end
 
