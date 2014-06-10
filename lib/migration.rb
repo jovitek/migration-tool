@@ -365,15 +365,21 @@ module Migration
             GoodData.with_project(object.new_project_pid) do |project|
               metrics = GoodData::Metric[:all].map { |meta|  GoodData::Metric[meta['link']]}
               metrics.map do |x|
-                x.tags =  x.tags + " migrated"
-                x.save
+
+                begin
+                  x.tags =  x.tags + " migrated"
+                  x.save
+                rescue
+                  $log.warn "Unable to tag metric: " + x.link
+                end 
+
               end
 
-              dashboards = GoodData::Dashboard[:all].map { |meta|  GoodData::Dashboard[meta['link']]}
-              dashboards.map do |x|
-                x.tags =  x.tags + " migrated"
-                x.save
-              end
+             # dashboards = GoodData::Dashboard[:all].map { |meta|  GoodData::Dashboard[meta['link']]}
+             # dashboards.map do |x|
+             #   x.tags =  x.tags + " migrated"
+             #   x.save
+             # end
             end
             # tag reports in schedule email jobs
             scheduledMails = GoodData.get('/gdc/md/' + object.new_project_pid + '/query/scheduledmails/')
@@ -513,7 +519,7 @@ module Migration
 
       connect_for_work()
       Storage.object_collection.each do |object|
-        if (object.status == Object.IMPORTED)
+        if (object.status == Object.TAGGED)
           GoodData.project = object.new_project_pid
 
           create = GoodData::Fact["dt.zendesktickets.createdat"]
@@ -603,8 +609,10 @@ module Migration
               end
               Storage.store_data
             else
-              object.status == Object.FILE_UPLOAD_FINISHED
+             
+              object.status = Object.FILE_UPLOAD_FINISHED
               Storage.store_data
+             
             end
           end
           if (!running_task.nil?)
@@ -669,7 +677,7 @@ module Migration
       $log.info inf
 
       Storage.object_collection.each do |object|
-        if (object.status == Object.REPLACE_SATISFACTION_VALUES and !@settings_color_palete.nil?)
+        if (object.status == Object.FILE_UPLOAD_FINISHED and !@settings_color_palete.nil?)
           begin
             result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
             if (object.status = Object.COLOR_TEMPLATE and object.type == "migration")
@@ -688,7 +696,7 @@ module Migration
             response = JSON.load(e.response)
             $log.error "Unknown error - Adding color palete to project #{object.new_project_pid} has failed and returned 500. Reason: #{response["message"]}"
           end
-        elsif (object.status == Object.REPLACE_SATISFACTION_VALUES and @settings_color_palete.nil?)
+        elsif (object.status == Object.FILE_UPLOAD_FINISHED and @settings_color_palete.nil?)
           object.status = Object.COLOR_TEMPLATE
           Storage.store_data
         end

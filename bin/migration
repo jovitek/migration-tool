@@ -35,7 +35,6 @@ command :start do |c|
       migration.rename_date_facts
       migration.execute_maql
       migration.upload_file
-      migration.replace_satisfaction_values
       migration.apply_color_template
       migration.execute_partial
       migration.swap_labels
