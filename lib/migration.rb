@@ -346,52 +346,63 @@ module Migration
       $log.info Time.now.inspect  + " - tagging metrics"
       Storage.object_collection.each do |object|
         if (object.status == Object.IMPORTED)
-          GoodData.with_project(object.new_project_pid) do |project|
-            metrics = GoodData::Metric[:all].map { |meta|  GoodData::Metric[meta['link']]}
-            metrics.map do |x|
-              x.tags =  x.tags + " migrated"
-              x.save
+          begin
+            GoodData.with_project(object.new_project_pid) do |project|
+              metrics = GoodData::Metric[:all].map { |meta|  GoodData::Metric[meta['link']]}
+              metrics.map do |x|
+                x.tags =  x.tags + " migrated"
+                x.save
+              end
+
+              dashboards = GoodData::Dashboard[:all].map { |meta|  GoodData::Dashboard[meta['link']]}
+              dashboards.map do |x|
+                x.tags =  x.tags + " migrated"
+                x.save
+              end
             end
-            
-            dashboards = GoodData::Dashboard[:all].map { |meta|  GoodData::Dashboard[meta['link']]}
-            dashboards.map do |x|
-              x.tags =  x.tags + " migrated"
-              x.save
-            end
-          end
-          # tag reports in schedule email jobs
-          scheduledMails = GoodData.get('/gdc/md/' + object.new_project_pid + '/query/scheduledmails/')
-          scheduledMails["query"]["entries"].each { |x|
-            scheduleMail = GoodData.get(x["link"])
-            scheduleMail["scheduledMail"]["content"]["attachments"].each { |y|
-              if !y["reportAttachment"].nil?
-                # attachements are reports, tag each report
-                scheduledObject = GoodData.get(y["reportAttachment"]["uri"])
-                scheduledObject["report"]["meta"]["tags"] = scheduledObject["report"]["meta"]["tags"] + ' migratedSchedEmail'
-                GoodData.post(scheduledObject["report"]["meta"]["uri"], scheduledObject)
-              else !y["dashboardAttachment"].nil?
-                # attachments are dashboards
-                tabs = y["dashboardAttachment"]["tabs"]
-                scheduledObject = GoodData.get(y["dashboardAttachment"]["uri"])
-                # only tag reports in dashboard tabs that are scheduled
-                tabs.each { |t|
-                  scheduledObject["projectDashboard"]["content"]["tabs"].select { |dt| dt["identifier"] == t}.each { |st|
-                    st["items"].each { |i|
-                      # only tag reports
-                      if !i["reportItem"].nil?
-                        report = GoodData.get(i["reportItem"]["obj"])
-                        report["report"]["meta"]["tags"] = report["report"]["meta"]["tags"] + ' migratedSchedEmail'
-                        GoodData.post(report["report"]["meta"]["uri"], report)
-                      end
+            # tag reports in schedule email jobs
+            scheduledMails = GoodData.get('/gdc/md/' + object.new_project_pid + '/query/scheduledmails/')
+            scheduledMails["query"]["entries"].each { |x|
+              scheduleMail = GoodData.get(x["link"])
+              scheduleMail["scheduledMail"]["content"]["attachments"].each { |y|
+                if !y["reportAttachment"].nil?
+                  # attachements are reports, tag each report
+                  scheduledObject = GoodData.get(y["reportAttachment"]["uri"])
+                  scheduledObject["report"]["meta"]["tags"] = scheduledObject["report"]["meta"]["tags"] + ' migratedSchedEmail'
+                  GoodData.post(scheduledObject["report"]["meta"]["uri"], scheduledObject)
+                else !y["dashboardAttachment"].nil?
+                  # attachments are dashboards
+                  tabs = y["dashboardAttachment"]["tabs"]
+                  scheduledObject = GoodData.get(y["dashboardAttachment"]["uri"])
+                  # only tag reports in dashboard tabs that are scheduled
+                  tabs.each { |t|
+                    scheduledObject["projectDashboard"]["content"]["tabs"].select { |dt| dt["identifier"] == t}.each { |st|
+                      st["items"].each { |i|
+                        # only tag reports
+                        if !i["reportItem"].nil?
+                          report = GoodData.get(i["reportItem"]["obj"])
+                          report["report"]["meta"]["tags"] = report["report"]["meta"]["tags"] + ' migratedSchedEmail'
+                          GoodData.post(report["report"]["meta"]["uri"], report)
+                        end
+                      }
                     }
                   }
-                }
-              end
+                end
+              }
             }
-          }
 
-          object.status = Object.TAGGED
-          Storage.store_data
+            object.status = Object.TAGGED
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.warn "Tagging metrics for #{object.new_project_pid} has failed. Reason: #{response["error"]["message"]}"
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.warn "Tagging metrics for #{object.new_project_pid}  has failed and returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.warn "Unknown error - The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
+          end
         end
 
       end
@@ -418,13 +429,13 @@ module Migration
             Storage.store_data
           rescue RestClient::BadRequest => e
             response = JSON.load(e.response)
-            @@log.warn "The maql could not be applied on project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+            $log.warn "The maql could not be applied on project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
           rescue RestClient::InternalServerError => e
             response = JSON.load(e.response)
-            @@log.warn "The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
+            $log.warn "The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
           rescue => e
             response = JSON.load(e.response)
-            @@log.warn "Unknown error - The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
+            $log.warn "Unknown error - The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
           end
 
           while (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count >= @settings_number_simultanious_projects)
