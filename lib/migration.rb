@@ -431,7 +431,7 @@ module Migration
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
-        if (object.status == Object.TAGGED)
+        if (object.status == Object.RENAME_DATE_FACT)
           $log.info "Starting maql execution on : #{object.new_project_pid}"
           maql = {
               "manage" => {
@@ -466,7 +466,7 @@ module Migration
                 for_check.status = Object.MAQL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.TAGGED
+                for_check.status = Object.RENAME_DATE_FACT
                 Storage.store_data
                 $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -491,7 +491,7 @@ module Migration
             for_check.status = Object.MAQL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.TAGGED
+            for_check.status = Object.RENAME_DATE_FACT
             Storage.store_data
             $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
@@ -513,7 +513,7 @@ module Migration
 
       connect_for_work()
       Storage.object_collection.each do |object|
-        if (object.status == Object.MAQL)
+        if (object.status == Object.IMPORTED)
           GoodData.project = object.new_project_pid
 
           create = GoodData::Fact["dt.zendesktickets.createdat"]
@@ -562,21 +562,21 @@ module Migration
       connect_for_work()
 
       # If we are not continuing, lets reset everything to beginning state
-      Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT}.each do |object|
+      Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
         object.uploads = []
         @settings_upload_files.each do |file|
           object.uploads << {"name" => file.keys.first,"path" => file.values.first, "status" => Object.UPLOAD_NEW}
         end
       end
 
-      Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT}.each do |object|
+      Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
         @settings_upload_files.each do |file|
           GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
         end
       end
 
-      while (Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT }.count > 0)
-        Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT}.each do |object|
+      while (Storage.object_collection.find_all{|o| o.status == Object.MAQL }.count > 0)
+        Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
           running_task = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_RUNNING}
           if (running_task.nil?)
             new_upload = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_NEW}
