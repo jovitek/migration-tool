@@ -287,7 +287,7 @@ module Migration
         elsif (object.status == Object.CREATED and object.type == "template")
           #Lets fake that the project was imported, because in case of template we are not importing
           #Moving directly after the Parial metada import export, because none of this task is done for template projects
-          object.status = Object.PARTIAL
+          object.status = Object.REPLACE_SATISFACTION_VALUES
           Storage.store_data
         end
 
@@ -617,6 +617,13 @@ module Migration
       end
     end
 
+  #  elsif (object.status == Object.CREATED and object.type == "template")
+  #  #Lets fake that the project was imported, because in case of template we are not importing
+  #  #Moving directly after the Parial metada import export, because none of this task is done for template projects
+  #  object.status = Object.REPLACE_SATISFACTION_VALUES
+  #  Storage.store_data
+  #end
+
 
     def apply_color_template
       $log.info Time.now.inspect  + " - uploading custom colour palettes"
@@ -624,7 +631,11 @@ module Migration
         if (object.status == Object.REPLACE_SATISFACTION_VALUES and !@settings_color_palete.nil?)
           begin
             result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
-            object.status = Object.COLOR_TEMPLATE
+            if (object.status = Object.COLOR_TEMPLATE and object.type == "migration")
+              object.status = Object.COLOR_TEMPLATE
+            elsif (object.status = Object.COLOR_TEMPLATE and object.type == "template")
+              object.status = Object.SWAP_LABELS_DASHBOARD
+            end
             Storage.store_data
           rescue RestClient::BadRequest => e
             response = JSON.load(e.response)
