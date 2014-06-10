@@ -31,13 +31,13 @@ command :start do |c|
       migration.create_projects
       migration.import_projects
       migration.tag_entities
+      migration.rename_date_facts
       migration.execute_maql
       migration.execute_partial
       migration.apply_color_template
       migration.upload_file(global_options[:continue])
       migration.swap_labels
       migration.replace_satisfaction_values
-      migration.rename_date_facts
       migration.create_user
       migration.create_integration
       migration.create_endpoint
