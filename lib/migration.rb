@@ -68,7 +68,10 @@ module Migration
 
 
     def load_source_data
-      puts(Time.now.inspect  + " - loading source data from csv")
+      inf = Time.now.inspect  + " - loading source data from csv"
+      puts(inf)
+      $log.info inf
+
       fail "Project file don't exists" if !File.exists?(@settings_project_file)
       pids = []
       CSV.foreach(@settings_project_file, {:headers => true, :skip_blanks => true}) do |csv_obj|
@@ -90,7 +93,9 @@ module Migration
 
 
     def load_data
-      $log.info Time.now.inspect + " - fetching connector settings from Z3 projects"
+      inf = Time.now.inspect + " - fetching connector settings from Z3 projects"
+      puts(inf)
+      $log.info inf
       connect_for_export()
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
@@ -112,7 +117,10 @@ module Migration
     end
 
     def get_export_tokens_projects
-      $log.info Time.now.inspect  + " - exporting source projects for cloning"
+
+      inf = Time.now.inspect  + " - exporting source projects for cloning"
+       puts(inf)
+      $log.info inf
       connect_for_export()
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
@@ -184,7 +192,9 @@ module Migration
 
 
     def create_projects
-      $log.info Time.now.inspect  + " - creating target projects"
+      inf = Time.now.inspect  + " - creating target projects"
+      puts(inf)
+      $log.info inf
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.CLONED)
@@ -270,7 +280,9 @@ module Migration
 
 
     def import_projects
-      $log.info Time.now.inspect  + " - importing clone tokens"
+      inf = Time.now.inspect  + " - importing clone tokens"
+       puts(inf)
+      $log.info inf
       Storage.object_collection.each do |object|
         if (object.status == Object.CREATED and object.type == "migration")
           $log.info "Starting import for project: #{object.old_project_pid} (new pid #{object.new_project_pid}"
@@ -343,7 +355,10 @@ module Migration
 
 
     def tag_entities
-      $log.info Time.now.inspect  + " - tagging metrics"
+      inf = Time.now.inspect  + " - tagging metrics"
+      puts(inf)
+      $log.info inf
+
       Storage.object_collection.each do |object|
         if (object.status == Object.IMPORTED)
           begin
@@ -409,7 +424,10 @@ module Migration
     end
 
     def execute_maql
-      $log.info Time.now.inspect  + " - executing update maql"
+      inf = Time.now.inspect  + " - executing update maql"
+      puts(inf)
+      $log.info inf
+
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
@@ -489,7 +507,10 @@ module Migration
 
 
     def rename_date_facts
-      $log.info Time.now.inspect  + " - renaming date facts"
+      inf = Time.now.inspect  + " - renaming date facts"
+      puts(inf)
+      $log.info inf
+
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.MAQL)
@@ -534,7 +555,10 @@ module Migration
 
 
     def upload_file(continue = false)
-      $log.info Time.now.inspect  + " - uploading data to datasets"
+      inf = Time.now.inspect  + " - uploading data to datasets"
+      puts(inf)
+      $log.info inf
+
       connect_for_work()
 
       # If we are not continuing, lets reset everything to beginning state
@@ -604,7 +628,10 @@ module Migration
 
 
     def replace_satisfaction_values
-      $log.info Time.now.inspect  + " - updating satisfaction metrics"
+      inf = Time.now.inspect  + " - updating satisfaction metrics"
+      puts(inf)
+      $log.info inf
+
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.FILE_UPLOAD_FINISHED )
@@ -637,7 +664,10 @@ module Migration
 
 
     def apply_color_template
-      $log.info Time.now.inspect  + " - uploading custom colour palettes"
+      inf = Time.now.inspect  + " - uploading custom colour palettes"
+      puts(inf)
+      $log.info inf
+
       Storage.object_collection.each do |object|
         if (object.status == Object.REPLACE_SATISFACTION_VALUES and !@settings_color_palete.nil?)
           begin
@@ -666,7 +696,10 @@ module Migration
     end
 
     def execute_partial
-      $log.info Time.now.inspect  + " - executing partial md import of the new dashboard"
+      inf = Time.now.inspect  + " - executing partial md import of the new dashboard"
+      puts(inf)
+      $log.info inf
+
       fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
       Storage.object_collection.each do |object|
         if (object.status == Object.COLOR_TEMPLATE)
@@ -747,7 +780,10 @@ module Migration
 
 
     def swap_labels
-      $log.info Time.now.inspect  + " - swapping labels in reports and dashboards"
+      inf = Time.now.inspect  + " - swapping labels in reports and dashboards"
+      puts(inf)
+      $log.info inf
+
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.PARTIAL)
@@ -808,7 +844,10 @@ module Migration
 
 
     def swap_label_dash_filters
-      $log.info Time.now.inspect  + " - swapping dashboard filters"
+      inf = Time.now.inspect  + " - swapping dashboard filters"
+      puts(inf)
+      $log.info inf
+
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.SWAP_LABELS)
@@ -848,7 +887,11 @@ module Migration
     end
 
     def create_user
-      $log.info Time.now.inspect  + " - creating connector users"
+      inf = Time.now.inspect  + " - creating connector users"
+      puts(inf)
+      $log.info inf
+
+
       fail "You need to specify Zendesk domain name" if @settings_domain.nil?
       users = GoodData::Domain.users(@settings_domain)
       user_entity = users.find{|u| u.login == @settings_user_to_add}
@@ -903,7 +946,10 @@ module Migration
 
 
     def create_integration
-      $log.info Time.now.inspect  + " - creating ZD4 integrations"
+      inf = Time.now.inspect  + " - creating ZD4 integrations"
+      puts(inf)
+      $log.info inf
+
       Storage.object_collection.each do |object|
         if (object.status == Object.USER_CREATED)
 
@@ -934,7 +980,10 @@ module Migration
 
 
     def create_endpoint
-      $log.info Time.now.inspect  + " - setting up ZD4 integrations"
+      inf = Time.now.inspect  + " - setting up ZD4 integrations"
+      puts(inf)
+      $log.info inf
+
       Storage.object_collection.each do |object|
         if (object.status == Object.INTEGRATION_CREATED)
 
@@ -964,7 +1013,10 @@ module Migration
 
 
     def run_integration
-      $log.info Time.now.inspect  + " - kicking off the ZD4 integrations"
+      inf = Time.now.inspect  + " - kicking off the ZD4 integrations"
+      puts(inf)
+      $log.info inf
+
       Storage.object_collection.each do |object|
         if (object.status == Object.ENDPOINT_SET)
           json = {
@@ -1006,17 +1058,6 @@ module Migration
       end
       $log.info "----------------------------------------------------"
     end
-
-
-
-
-
-
-
-
-
-
-
 
 
 
