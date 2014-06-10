@@ -50,6 +50,32 @@ module Migration
       "MAQL"
     end
 
+    def self.RENAME_DATE_FACT
+      "RENAME_DATE_FACT"
+    end
+
+    def self.FILE_UPLOAD_FINISHED
+      "UPLOAD_FILE_FINISHED"
+    end
+
+
+    def self.REPLACE_SATISFACTION_VALUES
+      "REPLACE_SATISFACTION_VALUES"
+    end
+
+    def self.COLOR_TEMPLATE
+      "COLOR_TEMPLATE"
+    end
+
+    def self.SWAP_LABELS
+      "SWAP_LABELS"
+    end
+
+    def self.SWAP_LABELS_DASHBOARD
+      "SWAP_LABELS_DASHBOARD"
+    end
+
+
     def self.PARTIAL_REQUESTED
       "PARTIAL_REQUESTED"
     end

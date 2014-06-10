@@ -90,7 +90,7 @@ module Migration
 
 
     def load_data
-      puts(Time.now.inspect + " - fetching connector settings from Z3 projects")
+      $log.info Time.now.inspect + " - fetching connector settings from Z3 projects"
       connect_for_export()
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
@@ -112,7 +112,7 @@ module Migration
     end
 
     def get_export_tokens_projects
-      puts(Time.now.inspect  + " - exporting source projects for cloning")
+      $log.info Time.now.inspect  + " - exporting source projects for cloning"
       connect_for_export()
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
@@ -184,7 +184,7 @@ module Migration
 
 
     def create_projects
-      puts(Time.now.inspect  + " - creating target projects")
+      $log.info Time.now.inspect  + " - creating target projects"
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.CLONED)
@@ -270,7 +270,7 @@ module Migration
 
 
     def import_projects
-      puts(Time.now.inspect  + " - importing clone tokens")
+      $log.info Time.now.inspect  + " - importing clone tokens"
       Storage.object_collection.each do |object|
         if (object.status == Object.CREATED and object.type == "migration")
           $log.info "Starting import for project: #{object.old_project_pid} (new pid #{object.new_project_pid}"
@@ -343,7 +343,7 @@ module Migration
 
 
     def tag_entities
-      puts(Time.now.inspect  + " - tagging metrics")
+      $log.info Time.now.inspect  + " - tagging metrics"
       Storage.object_collection.each do |object|
         if (object.status == Object.IMPORTED)
           GoodData.with_project(object.new_project_pid) do |project|
@@ -398,7 +398,7 @@ module Migration
     end
 
     def execute_maql
-      puts(Time.now.inspect  + " - executing update maql")
+      $log.info Time.now.inspect  + " - executing update maql"
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
@@ -476,11 +476,178 @@ module Migration
       end
     end
 
-    def execute_partial
-      puts (Time.now.inspect  + " - executing partial md import of the new dashboard")
-      fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
+
+    def rename_date_facts
+      $log.info Time.now.inspect  + " - renaming date facts"
+      connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.MAQL)
+          GoodData.project = object.new_project_pid
+
+          create = GoodData::Fact["dt.zendesktickets.createdat"]
+          #create.identifier = "fact.zendesktickets.createdat"
+          #create.save
+          createObj = GoodData.get(create.uri)
+          createObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.createdat"
+          GoodData.put(create.uri, createObj)
+
+          update = GoodData::Fact["dt.zendesktickets.updatedat"]
+          updateObj = GoodData.get(update.uri)
+          updateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.updatedat"
+          GoodData.put(update.uri, updateObj)
+
+          assign = GoodData::Fact["dt.zendesktickets.assignedat"]
+          assignObj = GoodData.get(assign.uri)
+          assignObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.assignedat"
+          GoodData.put(assign.uri, assignObj)
+
+          duedate = GoodData::Fact["dt.zendesktickets.duedate"]
+          duedateObj = GoodData.get(duedate.uri)
+          duedateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.duedate"
+          GoodData.put(duedate.uri, duedateObj)
+
+          initiallyassignedat = GoodData::Fact["dt.zendesktickets.initiallyassignedat"]
+          initiallyassignedatObj = GoodData.get(initiallyassignedat.uri)
+          initiallyassignedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.initiallyassignedat"
+          GoodData.put(initiallyassignedat.uri, initiallyassignedatObj)
+
+          solvedat = GoodData::Fact["dt.zendesktickets.solvedat"]
+          solvedatObj = GoodData.get(solvedat.uri)
+          solvedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.solvedat"
+          GoodData.put(solvedat.uri, solvedatObj)
+          object.status = Object.RENAME_DATE_FACT
+          Storage.store_data
+        end
+      end
+    end
+
+
+    def upload_file(continue = false)
+      $log.info Time.now.inspect  + " - uploading data to datasets"
+      connect_for_work()
+
+      # If we are not continuing, lets reset everything to beginning state
+      Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT}.each do |object|
+        object.uploads = []
+        @settings_upload_files.each do |file|
+          object.uploads << {"name" => file.keys.first,"path" => file.values.first, "status" => Object.UPLOAD_NEW}
+        end
+      end
+
+      Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT}.each do |object|
+        @settings_upload_files.each do |file|
+          GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
+        end
+      end
+
+      while (Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT }.count > 0)
+        Storage.object_collection.find_all{|o| o.status == Object.RENAME_DATE_FACT}.each do |object|
+          running_task = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_RUNNING}
+          if (running_task.nil?)
+            new_upload = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_NEW}
+            if (!new_upload.nil?)
+              json = {
+                  "pullIntegration" => "/#{object.new_project_pid}/#{new_upload["name"]}"
+              }
+              begin
+                res = GoodData.post("/gdc/md/#{object.new_project_pid}/etl/pull", json)
+                new_upload["uri"] = res["pullTask"]["uri"]
+                new_upload["status"] = Object.UPLOAD_RUNNING
+                running_task = new_upload
+              rescue RestClient::BadRequest => e
+                response = JSON.load(e.response)
+                new_upload["status"] = Object.UPLOAD_ERROR
+                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+              rescue RestClient::InternalServerError => e
+                response = JSON.load(e.response)
+                new_upload["status"] = Object.UPLOAD_ERROR
+                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+              rescue => e
+                new_upload["status"] = Object.UPLOAD_ERROR
+                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}.. Reason: Unknown reason"
+              end
+              Storage.store_data
+            else
+              object.status == Object.FILE_UPLOAD_FINISHED
+              Storage.store_data
+            end
+          end
+          if (!running_task.nil?)
+            begin
+              response = GoodData.get(running_task["uri"])
+              if (response["taskStatus"] == "OK" || response["taskStatus"] == "WARNING")
+                running_task["status"] = Object.UPLOAD_OK
+              elsif (response["taskStatus"] == "ERROR")
+                running_task["status"] = Object.UPLOAD_ERROR
+              end
+            rescue => e
+              running_task["status"] = Object.UPLOAD_ERROR
+              $log.warn "Upload of file #{running_task["name"]} has failed for project #{object.new_project_pid}. Reason: Unknown reason"
+            end
+            Storage.store_data
+          end
+        end
+        sleep(5)
+      end
+    end
+
+
+    def replace_satisfaction_values
+      $log.info Time.now.inspect  + " - updating satisfaction metrics"
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        if (object.status == Object.FILE_UPLOAD_FINISHED )
+          GoodData.project = object.new_project_pid
+          satisfactionScore = GoodData::Attribute.find_first_by_title('Ticket Satisfaction Score')
+          usedby = GoodData.get("/gdc/md/#{object.new_project_pid}/usedby2/5750")
+          links = usedby["entries"].select do |x|
+            x["category"]=="metric"
+          end.select do |x|
+            x["link"]!="/gdc/md/#{object.new_project_pid}/obj/6349"
+          end.map { |x| x['link'] }
+
+          links.each { |x|
+            metric = GoodData::Metric[x]
+            metric.replace_value(satisfactionScore.primary_label, 'Not%20Offered', 'Unoffered')
+            metric.save
+          }
+          object.status = Object.REPLACE_SATISFACTION_VALUES
+          Storage.store_data
+        end
+      end
+    end
+
+
+    def apply_color_template
+      $log.info Time.now.inspect  + " - uploading custom colour palettes"
+      Storage.object_collection.each do |object|
+        if (object.status == Object.REPLACE_SATISFACTION_VALUES and !@settings_color_palete.nil?)
+          begin
+            result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
+            object.status = Object.COLOR_TEMPLATE
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.error "Adding color palete to project #{object.new_project_pid} has failed. Reason: #{response["error"]["message"]}"
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.error "Adding color palete to project #{object.new_project_pid} has failed. Returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.error "Unknown error - Adding color palete to project #{object.new_project_pid} has failed and returned 500. Reason: #{response["message"]}"
+          end
+        elsif (object.status == Object.REPLACE_SATISFACTION_VALUES and @settings_color_palete.nil?)
+          object.status = Object.COLOR_TEMPLATE
+          Storage.store_data
+        end
+      end
+    end
+
+    def execute_partial
+      $log.info Time.now.inspect  + " - executing partial md import of the new dashboard"
+      fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
+      Storage.object_collection.each do |object|
+        if (object.status == Object.COLOR_TEMPLATE)
           json = {
               "partialMDImport" => {
                   "token" => "#{@settings_import_token}",
@@ -517,7 +684,7 @@ module Migration
                 for_check.status = Object.PARTIAL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.MAQL
+                for_check.status = Object.COLOR_TEMPLATE
                 Storage.store_data
                 $log.error "Applying Partial Metadata on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -541,7 +708,7 @@ module Migration
             for_check.status = Object.PARTIAL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.MAQL
+            for_check.status = Object.COLOR_TEMPLATE
             Storage.store_data
             $log.error "Applying Partial Metadata on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
@@ -557,13 +724,114 @@ module Migration
 
 
 
+    def swap_labels
+      $log.info Time.now.inspect  + " - swapping labels in reports and dashboards"
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        if (object.status == Object.PARTIAL)
+          project_pid = object.new_project_pid
+          label_from = ''
+          label_to = ''
+          GoodData.use project_pid
+          #start config loop here
+          @settings_swap_config.each do |s|
+            attr = GoodData::Attribute[s["attribute"]]
+            attr.labels.each do |x|
+              if x.meta["identifier"] == s["label_from"]
+                label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+              end
+              if x.meta["identifier"] == s["label_to"]
+                label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+              end
+            end
+
+            GoodData.with_project(project_pid) do |project|
+              linehash = {}
+              usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + label_from)
+              links = usedby["entries"].select do |x|
+                x["category"]=="reportDefinition"
+              end.map { |x| x['link'] }
+              definitions = links.map {|x| GoodData.get(x)}
+              what = "/gdc/md/#{project_pid}/obj/#{label_from}"
+              whatPatt = /(\/gdc\/md\/#{project_pid}\/obj\/#{label_from})/
+              definitions.each do |x|
+                jj = JSON.generate(x).gsub(/\"#{what}\"/,"\"/gdc/md/#{project_pid}/obj/#{label_to}\"")
+                payload = JSON.parse(jj)
+                # tag reports which have label_from in filter
+                x["reportDefinition"]["content"]["filters"].each do |f|
+                  if f["expression"] =~ whatPatt
+                    payload["reportDefinition"]["meta"]["tags"] = payload["reportDefinition"]["meta"]["tags"] + " migrationFixFilter"
+                  end
+                end
+                res = GoodData.put(x["reportDefinition"]["meta"]["uri"],payload)
+              end
+              dashboards = GoodData::Dashboard[:all]
+              dashboards.each do |x|
+                dd = GoodData::Dashboard[x["link"]]
+                dd.content["filters"].each do |x|
+                  if x["filterItemContent"]["obj"] == what
+                    # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
+                    x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
+                  end
+                end
+                dd.save
+              end
+            end
+          end
+          object.status = Object.SWAP_LABELS
+          Storage.store_data
+        end
+      end
+    end
+
+
+    def swap_label_dash_filters
+      $log.info Time.now.inspect  + " - swapping dashboard filters"
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        if (object.status == Object.SWAP_LABELS)
+          project_pid = object.new_project_pid
+          label_from = ''
+          label_to = ''
+
+          GoodData.use project_pid
+          #start config loop here
+          @settings_swap_config.each do |s|
+            attr = GoodData::Attribute[s["attribute"]]
+            attr.labels.each do |x|
+              if x.meta["identifier"] == s["label_from"]
+                label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+              end
+              if x.identifier == s["label_to"]
+                label_to = x.uri.gsub("/gdc/md/#{project_pid}/obj/","")
+              end
+            end
+            what = "/gdc/md/#{project_pid}/obj/#{label_from}"
+            dashboards = GoodData::Dashboard[:all]
+            dashboards.each do |x|
+              dd = GoodData::Dashboard[x["link"]]
+              dd.content["filters"].each do |x|
+                if x["filterItemContent"]["obj"] == what
+                  # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
+                  x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
+                end
+              end
+              dd.save
+            end
+          end
+          object.status = Object.SWAP_LABELS_DASHBOARD
+          Storage.store_data
+        end
+      end
+    end
+
     def create_user
-      puts (Time.now.inspect  + " - creating connector users")
+      $log.info Time.now.inspect  + " - creating connector users"
       fail "You need to specify Zendesk domain name" if @settings_domain.nil?
       users = GoodData::Domain.users(@settings_domain)
       user_entity = users.find{|u| u.login == @settings_user_to_add}
       Storage.object_collection.each do |object|
-        if (object.status == Object.PARTIAL)
+        if (object.status == Object.SWAP_LABELS_DASHBOARD)
 
           #Get roles in current project
           project = GoodData::Project[object.new_project_pid]
@@ -613,7 +881,7 @@ module Migration
 
 
     def create_integration
-      puts (Time.now.inspect  + " - creating ZD4 integrations")
+      $log.info Time.now.inspect  + " - creating ZD4 integrations"
       Storage.object_collection.each do |object|
         if (object.status == Object.USER_CREATED)
 
@@ -644,7 +912,7 @@ module Migration
 
 
     def create_endpoint
-      puts(Time.now.inspect  + " - setting up ZD4 integrations")
+      $log.info Time.now.inspect  + " - setting up ZD4 integrations"
       Storage.object_collection.each do |object|
         if (object.status == Object.INTEGRATION_CREATED)
 
@@ -674,7 +942,7 @@ module Migration
 
 
     def run_integration
-      puts(Time.now.inspect  + " - kicking off the ZD4 integrations")
+      $log.info Time.now.inspect  + " - kicking off the ZD4 integrations"
       Storage.object_collection.each do |object|
         if (object.status == Object.ENDPOINT_SET)
           json = {
@@ -700,33 +968,6 @@ module Migration
       end
     end
 
-
-    def apply_color_template
-      puts(Time.now.inspect  + " - uploading custom colour palettes")
-      Storage.object_collection.each do |object|
-        if (object.status == Object.ENDPOINT_SET_FINISHED and !@settings_color_palete.nil?)
-          begin
-            result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
-            object.status = Object.FINISHED
-            Storage.store_data
-          rescue RestClient::BadRequest => e
-            response = JSON.load(e.response)
-            $log.error "Adding color palete to project #{object.new_project_pid} has failed. Reason: #{response["error"]["message"]}"
-          rescue RestClient::InternalServerError => e
-            response = JSON.load(e.response)
-            $log.error "Adding color palete to project #{object.new_project_pid} has failed. Returned 500. Reason: #{response["error"]["message"]}"
-          rescue => e
-            response = JSON.load(e.response)
-            $log.error "Unknown error - Adding color palete to project #{object.new_project_pid} has failed and returned 500. Reason: #{response["message"]}"
-          end
-        elsif (object.status == Object.ENDPOINT_SET_FINISHED and @settings_color_palete.nil?)
-          object.status = Object.FINISHED
-          Storage.store_data
-        end
-      end
-    end
-
-
     def conntact_zendesk_endpoint
       auth = {:username => @connection_zendesk_username, :password => @connection_zendesk_password}
       @subdomain = "?"
@@ -746,263 +987,13 @@ module Migration
 
 
 
-    def upload_file(continue = false)
-      puts(Time.now.inspect  + " - uploading data to datasets")
-      connect_for_work()
-      if (!continue)
-        # If we are not continuing, lets reset everything to beginning state
-        Storage.object_collection.each do |object|
-          object.uploads = []
-          object.upload_finished = false
-          @settings_upload_files.each do |file|
-            object.uploads << {"name" => file.keys.first,"path" => file.values.first, "status" => Object.UPLOAD_NEW}
-          end
-        end
-      else
-        Storage.object_collection.each do |object|
-          object.uploads.each do |upload|
-            upload["status"] = Object.UPLOAD_NEW
-          end
-          object.upload_finished = false
-        end
-      end
-      Storage.object_collection.each do |object|
-        @settings_upload_files.each do |file|
-          GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
-        end
-      end
 
-      while (Storage.object_collection.find_all{|o| o.upload_finished == false}.count > 0)
-        Storage.object_collection.find_all{|o| o.upload_finished == false}.each do |object|
-          running_task = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_RUNNING}
-          if (running_task.nil?)
-            new_upload = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_NEW}
-            if (!new_upload.nil?)
-              json = {
-                      "pullIntegration" => "/#{object.new_project_pid}/#{new_upload["name"]}"
-                     }
-              begin
-                res = GoodData.post("/gdc/md/#{object.new_project_pid}/etl/pull", json)
-                new_upload["uri"] = res["pullTask"]["uri"]
-                new_upload["status"] = Object.UPLOAD_RUNNING
-                running_task = new_upload
-              rescue RestClient::BadRequest => e
-                response = JSON.load(e.response)
-                new_upload["status"] = Object.UPLOAD_ERROR
-                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
-              rescue RestClient::InternalServerError => e
-                response = JSON.load(e.response)
-                new_upload["status"] = Object.UPLOAD_ERROR
-                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
-              rescue => e
-                new_upload["status"] = Object.UPLOAD_ERROR
-                $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}.. Reason: Unknown reason"
-              end
-              Storage.store_data
-            else
-              object.upload_finished = true
-              Storage.store_data
-            end
-          end
-          if (!running_task.nil?)
-            begin
-              response = GoodData.get(running_task["uri"])
-              if (response["taskStatus"] == "OK" || response["taskStatus"] == "WARNING")
-                running_task["status"] = Object.UPLOAD_OK
-              elsif (response["taskStatus"] == "ERROR")
-                running_task["status"] = Object.UPLOAD_ERROR
-              end
-            rescue => e
-              running_task["status"] = Object.UPLOAD_ERROR
-              $log.warn "Upload of file #{running_task["name"]} has failed for project #{object.new_project_pid}. Reason: Unknown reason"
-            end
-            Storage.store_data
-          end
-        end
-        sleep(5)
-      end
-    end
 
-    def replace_satisfaction_values
-      puts(Time.now.inspect  + " - updating satisfaction metrics")
-      connect_for_work()
-      Storage.object_collection.each do |object|
-        GoodData.project = object.new_project_pid
-        satisfactionScore = GoodData::Attribute.find_first_by_title('Ticket Satisfaction Score')
-        usedby = GoodData.get("/gdc/md/#{object.new_project_pid}/usedby2/5750")
-        links = usedby["entries"].select do |x|
-          x["category"]=="metric"
-        end.select do |x|
-          x["link"]!="/gdc/md/#{object.new_project_pid}/obj/6349"
-        end.map { |x| x['link'] }
 
-        links.each { |x|
-          metric = GoodData::Metric[x]
-          metric.replace_value(satisfactionScore.primary_label, 'Not%20Offered', 'Unoffered')
-          metric.save
-        }
-      end
-    end
 
-    def swap_label_dash_filters
-      puts(Time.now.inspect  + " - swapping dashboard filters")
-      connect_for_work()
-      Storage.object_collection.each do |object|
-        project_pid = object.new_project_pid
-        label_from = ''
-        label_to = ''
 
-        GoodData.use project_pid
 
-        #start config loop here
-        @settings_swap_config.each { |s|
-          
-          attr = GoodData::Attribute[s["attribute"]]
 
-          attr.labels.each { |x|
-
-            if x.meta["identifier"] == s["label_from"]
-
-              label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-            end
-            if x.identifier == s["label_to"]
-              label_to = x.uri.gsub("/gdc/md/#{project_pid}/obj/","")
-            end
-          }
-
-          what = "/gdc/md/#{project_pid}/obj/#{label_from}"
-
-          dashboards = GoodData::Dashboard[:all]
-
-          dashboards.each { |x|
-            dd = GoodData::Dashboard[x["link"]]
-
-            dd.content["filters"].each { |x|
-
-              if x["filterItemContent"]["obj"] == what
-                # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
-                x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
-              end
-            }
-            dd.save
-          }
-        }
-      end
-    end
-
-    def swap_labels
-      puts(Time.now.inspect  + " - swapping labels in reports and dashboards")
-      connect_for_work()
-      Storage.object_collection.each do |object|
-        project_pid = object.new_project_pid
-        label_from = ''
-        label_to = ''
-
-        GoodData.use project_pid
-
-        #start config loop here
-        @settings_swap_config.each { |s|
-
-          attr = GoodData::Attribute[s["attribute"]]
-
-          attr.labels.each { |x|
-
-            if x.meta["identifier"] == s["label_from"]
-              label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-            end
-
-            if x.meta["identifier"] == s["label_to"]
-              label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
-            end
-
-          };
-
-          GoodData.with_project(project_pid) do |project|
-
-            linehash = {}
-
-            usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + label_from)
-            links = usedby["entries"].select do |x|
-              x["category"]=="reportDefinition"
-            end.map { |x| x['link'] }
-
-            definitions = links.map {|x| GoodData.get(x)}
-            what = "/gdc/md/#{project_pid}/obj/#{label_from}"
-            whatPatt = /(\/gdc\/md\/#{project_pid}\/obj\/#{label_from})/
-
-            definitions.each { |x|
-              jj = JSON.generate(x).gsub(/\"#{what}\"/,"\"/gdc/md/#{project_pid}/obj/#{label_to}\"")
-
-              payload = JSON.parse(jj)
-
-              # tag reports which have label_from in filter
-              x["reportDefinition"]["content"]["filters"].each { |f|
-                if f["expression"] =~ whatPatt
-                  payload["reportDefinition"]["meta"]["tags"] = payload["reportDefinition"]["meta"]["tags"] + " migrationFixFilter"
-                end
-              }
-
-              res = GoodData.put(x["reportDefinition"]["meta"]["uri"],payload)
-            }
-
-            dashboards = GoodData::Dashboard[:all]
-
-            dashboards.each { |x|
-              dd = GoodData::Dashboard[x["link"]]
-
-              dd.content["filters"].each { |x|
-
-                if x["filterItemContent"]["obj"] == what
-                  # puts("Replacing " + x["filterItemContent"]["obj"] + " with " +  x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}") )
-                  x["filterItemContent"]["obj"] = x["filterItemContent"]["obj"].gsub(/#{what}/,"/gdc/md/#{project_pid}/obj/#{label_to}")
-                end
-              }
-              dd.save
-            }
-          end
-        }
-      end
-    end
-    
-    def rename_date_facts
-      puts(Time.now.inspect  + " - renaming date facts")
-      connect_for_work()
-      Storage.object_collection.each do |object|
-        GoodData.project = object.new_project_pid
-        
-        create = GoodData::Fact["dt.zendesktickets.createdat"]
-        #create.identifier = "fact.zendesktickets.createdat"
-        #create.save
-        createObj = GoodData.get(create.uri)
-        createObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.createdat"
-        GoodData.put(create.uri, createObj)
-        
-        update = GoodData::Fact["dt.zendesktickets.updatedat"]
-        updateObj = GoodData.get(update.uri)
-        updateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.updatedat"
-        GoodData.put(update.uri, updateObj)
-        
-        assign = GoodData::Fact["dt.zendesktickets.assignedat"]
-        assignObj = GoodData.get(assign.uri)
-        assignObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.assignedat"
-        GoodData.put(assign.uri, assignObj)
-        
-        duedate = GoodData::Fact["dt.zendesktickets.duedate"]
-        duedateObj = GoodData.get(duedate.uri)
-        duedateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.duedate"
-        GoodData.put(duedate.uri, duedateObj)
-        
-        initiallyassignedat = GoodData::Fact["dt.zendesktickets.initiallyassignedat"]
-        initiallyassignedatObj = GoodData.get(initiallyassignedat.uri)
-        initiallyassignedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.initiallyassignedat"
-        GoodData.put(initiallyassignedat.uri, initiallyassignedatObj)
-        
-        solvedat = GoodData::Fact["dt.zendesktickets.solvedat"]
-        solvedatObj = GoodData.get(solvedat.uri)
-        solvedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.solvedat"
-        GoodData.put(solvedat.uri, solvedatObj)
-      end
-    end
 
 
 
