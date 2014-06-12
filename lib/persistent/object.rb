@@ -13,6 +13,11 @@ module Migration
       "NEW"
     end
 
+
+    def self.IGNORE
+      "IGNORE"
+    end
+
     def self.PROVISIONING
       "PROVISIONING"
     end

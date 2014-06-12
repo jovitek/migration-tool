@@ -99,19 +99,25 @@ module Migration
       connect_for_export()
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
-          project = GoodData.get("/gdc/projects/#{object.old_project_pid}")
-          object.title = project["project"]["meta"]["title"]
-          object.summary = project["project"]["meta"]["summary"]
+          begin
+            project = GoodData.get("/gdc/projects/#{object.old_project_pid}")
+            object.title = project["project"]["meta"]["title"]
+            object.summary = project["project"]["meta"]["summary"]
 
-          integration_setting = GoodData.get("/gdc/projects/#{object.old_project_pid}/connectors/zendesk3/integration/config/settings")
-          object.api_url = integration_setting["settings"]["apiUrl"]
+            integration_setting = GoodData.get("/gdc/projects/#{object.old_project_pid}/connectors/zendesk3/integration/config/settings")
+            object.api_url = integration_setting["settings"]["apiUrl"]
 
-          if (object.type == "migration")
-            object.status = Object.NEW
-          elsif (object.type == "template")
-            object.status = Object.CLONED
+            if (object.type == "migration")
+              object.status = Object.NEW
+            elsif (object.type == "template")
+              object.status = Object.CLONED
+            end
+            Storage.store_data
+          rescue => e
+            $log.warn "The project #{object.old_project_pid} is being ignored, because we cannot get source data"
+            object.status = Object.IGNORE
+            Storage.store_data
           end
-          Storage.store_data
         end
       end
     end
@@ -819,22 +825,22 @@ module Migration
             attr = GoodData::Attribute[s["attribute"]]
             attr.labels.each do |x|
               if x.meta["identifier"] == s["label_from"]
-                label_from = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+                label_from = x.meta["uri"].split("/").last
               end
               if x.meta["identifier"] == s["label_to"]
-                label_to = x.meta["uri"].gsub("/gdc/md/#{project_pid}/obj/","")
+                label_to = x.meta["uri"].split("/").last
               end
             end
 
             GoodData.with_project(project_pid) do |project|
               linehash = {}
               usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + label_from)
-              links = usedby["entries"].select do |x|
-                x["category"]=="reportDefinition"
-              end.map { |x| x['link'] }
+              links = usedby["entries"].select {|x| x["category"]=="reportDefinition"}.map { |x| x['link'] }
+              pp links
               definitions = links.map {|x| GoodData.get(x)}
               what = "/gdc/md/#{project_pid}/obj/#{label_from}"
               whatPatt = /(\/gdc\/md\/#{project_pid}\/obj\/#{label_from})/
+              report_definition_to_tag = []
               definitions.each do |x|
                 jj = JSON.generate(x).gsub(/\"#{what}\"/,"\"/gdc/md/#{project_pid}/obj/#{label_to}\"")
                 payload = JSON.parse(jj)
@@ -842,9 +848,19 @@ module Migration
                 x["reportDefinition"]["content"]["filters"].each do |f|
                   if f["expression"] =~ whatPatt
                     payload["reportDefinition"]["meta"]["tags"] = payload["reportDefinition"]["meta"]["tags"] + " migrationFixFilter"
+                    report_definition_to_tag << x["reportDefinition"]["meta"]["uri"].split("/").last
                   end
                 end
                 res = GoodData.put(x["reportDefinition"]["meta"]["uri"],payload)
+              end
+              report_definition_to_tag.each do |report_definition_id|
+                usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/#{report_definition_id}" )
+                links = usedby["entries"].select {|x| x["category"]=="report"}
+                links.each do |link|
+                  report = GoodData::Report[link["link"].split("/").last]
+                  report.tags += " migrationFixFilter"
+                  report.save
+                end
               end
               dashboards = GoodData::Dashboard[:all]
               dashboards.each do |x|
