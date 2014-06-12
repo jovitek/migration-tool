@@ -375,12 +375,27 @@ module Migration
 
               end
 
-             # dashboards = GoodData::Dashboard[:all].map { |meta|  GoodData::Dashboard[meta['link']]}
-             # dashboards.map do |x|
-             #   x.tags =  x.tags + " migrated"
-             #   x.save
-             # end
+              a = GoodData::Attribute['attr.zendesktickets.satisfactionscore']
+
+              links = a.usedby('metric').map { |x| x['link'] }
+              #pp links
+
+              links.each { |x|
+                
+                begin
+                  metric = GoodData::Metric[x]
+                #  pp metric
+                  metric.tags = metric.tags + " migrated_checkSat"
+                  metric.save
+                rescue
+                  $log.warn "Unable to tag metric: " + x.link
+                end 
+              }
+             
+
             end
+
+
             # tag reports in schedule email jobs
             scheduledMails = GoodData.get('/gdc/md/' + object.new_project_pid + '/query/scheduledmails/')
             scheduledMails["query"]["entries"].each { |x|
@@ -389,7 +404,7 @@ module Migration
                 if !y["reportAttachment"].nil?
                   # attachements are reports, tag each report
                   scheduledObject = GoodData.get(y["reportAttachment"]["uri"])
-                  scheduledObject["report"]["meta"]["tags"] = scheduledObject["report"]["meta"]["tags"] + ' migratedSchedEmail'
+                  scheduledObject["report"]["meta"]["tags"] = scheduledObject["report"]["meta"]["tags"] + ' migrated_schedEmail'
                   GoodData.post(scheduledObject["report"]["meta"]["uri"], scheduledObject)
                 else !y["dashboardAttachment"].nil?
                   # attachments are dashboards
@@ -402,7 +417,7 @@ module Migration
                         # only tag reports
                         if !i["reportItem"].nil?
                           report = GoodData.get(i["reportItem"]["obj"])
-                          report["report"]["meta"]["tags"] = report["report"]["meta"]["tags"] + ' migratedSchedEmail'
+                          report["report"]["meta"]["tags"] = report["report"]["meta"]["tags"] + ' migrated_schedEmail'
                           GoodData.post(report["report"]["meta"]["uri"], report)
                         end
                       }
