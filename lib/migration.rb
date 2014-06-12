@@ -442,8 +442,7 @@ module Migration
             response = JSON.load(e.response)
             $log.warn "Tagging metrics for #{object.new_project_pid}  has failed and returned 500. Reason: #{response["error"]["message"]}"
           rescue => e
-            response = JSON.load(e.response)
-            $log.warn "Unknown error - The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
+            $log.warn "Unknown error - The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{e.message}"
           end
         end
 
