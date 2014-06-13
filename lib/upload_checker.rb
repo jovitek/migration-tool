@@ -8,7 +8,7 @@ META_FILE_PATH = "meta.json"
 @object_collection = []
 PROJECTS = {}
 
-connect_for_work()
+GoodData.connect("","",{:webdav_server => "https://na1-di.gooddata.com",:server => ""})
 
 if (File.exist?(META_FILE_PATH))
     json = JSON.load( File.open(META_FILE_PATH) )
@@ -29,7 +29,7 @@ end
 	if PROJECTS[obj.new_project_pid] != 'DONE'
 
 		begin
-
+			
 			res = GoodData.get(obj.zendesk_sync_process)
 			PROJECTS[obj.new_project_pid] = res["process"]["status"]["code"]
 
@@ -60,18 +60,20 @@ end
 
 
 			# output to csv instead of puts would be great
-			puts "[Processing ] " + obj.new_project_pid + " (" + res["process"]["status"]["code"] + ")"
+			puts obj.status + "," + obj.api_url + "," + obj.old_project_pid  + ","+ obj.new_project_pid + "," + res["process"]["status"]["code"]
 
 		rescue
 
 			PROJECTS[obj.new_project_pid] = 'ERR'
-			puts "[Skipping]   " + obj.new_project_pid + " (ERR)"
+			puts obj.status + "," + obj.api_url + "," + obj.old_project_pid  + ","+ obj.new_project_pid + ",N/A" 
+
 
 		end
 
 	else
 
-		puts "[Skipping]   " + obj.new_project_pid + " (DONE)"
+		puts obj.status + "," + obj.api_url + "," + obj.old_project_pid  + ","+ obj.new_project_pid + "," + res["process"]["status"]["code"]
+
 
 	end	
 end
@@ -83,3 +85,4 @@ File.open(META_FILE_PATH,"w") do |file|
         file.puts JSON.dump(json)
     
 end
+

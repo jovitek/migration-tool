@@ -75,16 +75,19 @@ module Migration
       fail "Project file don't exists" if !File.exists?(@settings_project_file)
       pids = []
       CSV.foreach(@settings_project_file, {:headers => true, :skip_blanks => true}) do |csv_obj|
-        pids.push({"pid" => csv_obj["project_pid"], "type" => csv_obj["type"]})
+        pids.push({"pid" => csv_obj["project_pid"], "type" => csv_obj["type"], "zd_account" => csv_obj["account"]})
       end
       pids.uniq! {|p| p["pid"]}
       pids.each do |hash|
         object = Storage.get_object_by_old_project_pid(hash["pid"])
         if (object.nil?)
           object = Object.new()
+
           object.old_project_pid = hash["pid"]
+         
           fail "The project type |#{hash["type"]}| for pid #{hash["pid"]} is not valid. Valid types: #{Object.VALID_TYPES.join(",")}" if Object.VALID_TYPES.find{|t| t == hash["type"]}.nil?
           object.type = hash["type"]
+          object.zd_account = hash["zd_account"]
           object.status = Object.NEW
           Storage.add_object(object)
         end
@@ -100,12 +103,19 @@ module Migration
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
           begin
-            project = GoodData.get("/gdc/projects/#{object.old_project_pid}")
-            object.title = project["project"]["meta"]["title"]
-            object.summary = project["project"]["meta"]["summary"]
 
-            integration_setting = GoodData.get("/gdc/projects/#{object.old_project_pid}/connectors/zendesk3/integration/config/settings")
-            object.api_url = integration_setting["settings"]["apiUrl"]
+            if object.zd_account && object.zd_account != "" && object.type == "template"
+              object.api_url = "https://" +  object.zd_account + ".zendesk.com"
+              object.title = object.zd_account
+              object.summary = ''
+
+            else 
+              project = GoodData.get("/gdc/projects/#{object.old_project_pid}")
+              object.title = project["project"]["meta"]["title"]
+              object.summary = project["project"]["meta"]["summary"]
+              integration_setting = GoodData.get("/gdc/projects/#{object.old_project_pid}/connectors/zendesk3/integration/config/settings")
+              object.api_url = integration_setting["settings"]["apiUrl"]
+            end
 
             if (object.type == "migration")
               object.status = Object.NEW
@@ -305,7 +315,7 @@ module Migration
         elsif (object.status == Object.CREATED and object.type == "template")
           #Lets fake that the project was imported, because in case of template we are not importing
           #Moving directly after the Parial metada import export, because none of this task is done for template projects
-          object.status = Object.REPLACE_SATISFACTION_VALUES
+          object.status = Object.TAGGED
           Storage.store_data
         end
 
@@ -539,7 +549,7 @@ module Migration
 
       connect_for_work()
       Storage.object_collection.each do |object|
-        if (object.status == Object.TAGGED)
+        if (object.status == Object.TAGGED && object.type != "template")
           GoodData.project = object.new_project_pid
 
           create = GoodData::Fact["dt.zendesktickets.createdat"]
@@ -575,7 +585,10 @@ module Migration
           GoodData.put(solvedat.uri, solvedatObj)
           object.status = Object.RENAME_DATE_FACT
           Storage.store_data
+        else 
+          object.status = Object.FILE_UPLOAD_FINISHED
         end
+
       end
     end
 
