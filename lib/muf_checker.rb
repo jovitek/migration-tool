@@ -69,7 +69,7 @@ module Migration
             if (json["query"]["entries"].count > 0)
               object.hasMandatoryUserFilter = true
             else
-              object.hasMandatoryUserFilter = false;
+              object.hasMandatoryUserFilter = false
             end
             object.isFilterChecked = true
             Storage.store_data
