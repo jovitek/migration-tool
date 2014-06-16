@@ -467,7 +467,7 @@ module Migration
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
-        if (object.status == Object.RENAME_DATE_FACT)
+        if (object.status == Object.FIXED_DATE_FACTS)
           $log.info "Starting maql execution on : #{object.new_project_pid}"
           maql = {
               "manage" => {
@@ -502,7 +502,7 @@ module Migration
                 for_check.status = Object.MAQL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.RENAME_DATE_FACT
+                for_check.status = Object.FIXED_DATE_FACTS
                 Storage.store_data
                 $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -527,7 +527,7 @@ module Migration
             for_check.status = Object.MAQL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.RENAME_DATE_FACT
+            for_check.status = Object.FIXED_DATE_FACTS
             Storage.store_data
             $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
@@ -818,6 +818,108 @@ module Migration
       end
     end
 
+    def fix_date_facts
+      inf = Time.now.inspect  + " - fixing date facts metrics"
+      puts(inf)
+      $log.info inf
+
+      connect_for_work()
+      Storage.object_collection.each do |object|
+        if (object.status == Object.RENAME_DATE_FACT && object.type != "template")
+          project_pid = object.new_project_pid
+          GoodData.with_project(project_pid) do |project|
+            
+            err = 'false'
+            standard_metrics = []
+            facts = []
+
+            begin 
+              createdatfact = GoodData::Fact['fact.zendesktickets.createdat']
+              initiallyassignedat = GoodData::Fact['fact.zendesktickets.initiallyassignedat']
+              updatedatfact = GoodData::Fact['fact.zendesktickets.updatedat']
+              solvedatfact = GoodData::Fact['fact.zendesktickets.solvedat']
+              duedatefact = GoodData::Fact['fact.zendesktickets.duedate']
+              assignedatfact = GoodData::Fact['fact.zendesktickets.assignedat']
+
+              facts << createdatfact
+              facts << initiallyassignedat
+              facts << updatedatfact
+              facts << solvedatfact
+              facts << duedatefact
+              facts << assignedatfact
+
+              createdat_uri = createdatfact.uri
+              initiallyassignedat_uri = initiallyassignedat.uri
+              created_d_uri = GoodData::Attribute['created.date'].uri
+              ticketid_uri = GoodData::Attribute['attr.zendesktickets.ticketid'].uri
+
+
+              ######## FIX standard metrics
+
+              begin
+                ticketagemax = GoodData::Metric['avaRleKObsIR']
+                ticketagemax.expression = "SELECT MAX({Today} - [#{created_d_uri}]) BY [#{ticketid_uri}]"
+                ticketagemax.save
+
+                standard_metrics << ticketagemax.uri
+              rescue
+                err = 'true'
+              end
+
+              begin
+                ticketageavg = GoodData::Metric['aiBRjo2NbsDq']
+                ticketageavg.expression = "SELECT AVG({Today} - [#{created_d_uri}]) BY [#{ticketid_uri}]" 
+                ticketageavg.save
+
+                standard_metrics << ticketageavg.uri
+              rescue
+                err = 'true'
+              end
+
+              begin
+                assigntimemin = GoodData::Metric['age0HBIva1aP']
+                assigntimemin.expression = "SELECT AVG([#{initiallyassignedat_uri}] - [#{createdat_uri}]) BY [#{ticketid_uri}] WHERE [/gdc/md/#{project_pid}/obj/1305]<>[/gdc/md/#{project_pid}/obj/1305/elements?id=9]  AND IFNULL([#{initiallyassignedat_uri}],0) > 0"
+                assigntimemin.save
+
+                standard_metrics << assigntimemin.uri
+              rescue
+                err = 'true'
+              end
+
+              begin
+                assigntimehrs = GoodData::Metric['afz0OdGSffEC']
+                assigntimehrs.expression = "SELECT AVG([#{initiallyassignedat_uri}] - [#{createdat_uri}])/60 BY [#{ticketid_uri}] WHERE [/gdc/md/#{project_pid}/obj/1305]<>[/gdc/md/#{project_pid}/obj/1305/elements?id=9]  AND IFNULL([#{initiallyassignedat_uri}],0) > 0"
+                assigntimehrs.save
+
+                standard_metrics << assigntimehrs.uri
+              rescue
+                err = 'true'
+              end
+
+              ######### TAG non-standard metrics
+
+              facts.each {  |f|
+                 f.used_by('metric').select { |m| !standard_metrics.include?(m['link']) }.each { |mm|
+
+                o = GoodData::Metric[mm['link']]
+                o.tags = o.tags + ' migrated_checkDateFacts'
+                o.save
+
+                }
+
+               }
+
+            rescue  => e
+              pp e
+            end
+
+          object.status = Object.FIXED_DATE_FACTS
+          Storage.store_data
+
+          end
+        end
+      end
+    end
 
 
     def swap_labels
@@ -828,15 +930,20 @@ module Migration
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.PARTIAL)
+        #if (object.status != "v prdeli")
           project_pid = object.new_project_pid
           label_from = ''
+          attr_from = ''
           label_to = ''
           GoodData.use project_pid
           #start config loop here
           @settings_swap_config.each do |s|
             attr = GoodData::Attribute[s["attribute"]]
+            attr_from = attr.uri.split("/").last
+
             attr.labels.each do |x|
               if x.meta["identifier"] == s["label_from"]
+
                 label_from = x.meta["uri"].split("/").last
               end
               if x.meta["identifier"] == s["label_to"]
@@ -848,32 +955,47 @@ module Migration
               linehash = {}
               usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + label_from)
               links = usedby["entries"].select {|x| x["category"]=="reportDefinition"}.map { |x| x['link'] }
-              pp links
               definitions = links.map {|x| GoodData.get(x)}
               what = "/gdc/md/#{project_pid}/obj/#{label_from}"
-              whatPatt = /(\/gdc\/md\/#{project_pid}\/obj\/#{label_from})/
+              whatPatt = /(\/gdc\/md\/#{project_pid}\/obj\/#{attr_from}\/elements?)/
+
+
               report_definition_to_tag = []
               definitions.each do |x|
                 jj = JSON.generate(x).gsub(/\"#{what}\"/,"\"/gdc/md/#{project_pid}/obj/#{label_to}\"")
                 payload = JSON.parse(jj)
-                # tag reports which have label_from in filter
-                x["reportDefinition"]["content"]["filters"].each do |f|
-                  if f["expression"] =~ whatPatt
-                    payload["reportDefinition"]["meta"]["tags"] = payload["reportDefinition"]["meta"]["tags"] + " migrationFixFilter"
-                    report_definition_to_tag << x["reportDefinition"]["meta"]["uri"].split("/").last
-                  end
-                end
                 res = GoodData.put(x["reportDefinition"]["meta"]["uri"],payload)
+               end
+
+              ########## tag reports which have label_from in filter
+              usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/" + attr_from)
+              links = usedby["entries"].select {|x| x["category"]=="reportDefinition"}.map { |x| x['link'] }
+              definitions = links.map {|x| GoodData.get(x)}
+
+              definitions.each do |x|
+                x["reportDefinition"]["content"]["filters"].each do |f|
+                    if f["expression"] =~ whatPatt
+                      report_definition_to_tag << x["reportDefinition"]["meta"]["uri"].split("/").last
+                    end
+                end
               end
+
               report_definition_to_tag.each do |report_definition_id|
                 usedby = GoodData.get("/gdc/md/#{project_pid}/usedby2/#{report_definition_id}" )
                 links = usedby["entries"].select {|x| x["category"]=="report"}
                 links.each do |link|
                   report = GoodData::Report[link["link"].split("/").last]
-                  report.tags += " migrationFixFilter"
-                  report.save
+
+                  if !report.meta.key?('locked') 
+                    report.tags += " migrated_FixFilter"
+                    report.save                  
+                  end
+
+                  
                 end
               end
+
+              # swap dashboard filters
               dashboards = GoodData::Dashboard[:all]
               dashboards.each do |x|
                 dd = GoodData::Dashboard[x["link"]]
@@ -947,7 +1069,7 @@ module Migration
       users = GoodData::Domain.users(@settings_domain)
       user_entity = users.find{|u| u.login == @settings_user_to_add}
       Storage.object_collection.each do |object|
-        if (object.status == Object.SWAP_LABELS_DASHBOARD)
+        if (object.status == Object.SWAP_LABELS)
 
           #Get roles in current project
           project = GoodData::Project[object.new_project_pid]
