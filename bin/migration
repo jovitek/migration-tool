@@ -33,6 +33,7 @@ command :start do |c|
       migration.import_projects
       migration.tag_entities
       migration.rename_date_facts
+      migration.fix_date_facts
       migration.execute_maql
       migration.upload_file
       migration.apply_color_template

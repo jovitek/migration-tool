@@ -1069,7 +1069,7 @@ module Migration
       users = GoodData::Domain.users(@settings_domain)
       user_entity = users.find{|u| u.login == @settings_user_to_add}
       Storage.object_collection.each do |object|
-        if (object.status == Object.SWAP_LABELS)
+        if (object.status == Object.SWAP_LABELS_DASHBOARD)
 
           #Get roles in current project
           project = GoodData::Project[object.new_project_pid]
