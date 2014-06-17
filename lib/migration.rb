@@ -1231,12 +1231,58 @@ module Migration
       end
       $log.info "----------------------------------------------------"
     end
+    
+    
+    
+    def check_mufs_in_projects
+      inf = Time.now.inspect + " checking mandatory user filters in projects"
+      puts(inf)
+      $log.info inf
 
-
-
+      Storage.object_collection.each do |object|
+        if !object.isFilterChecked
+          begin
+            pid = object.old_project_pid
+            json = GoodData.get("/gdc/md/#{pid}/query/userfilters")
+            if (json["query"]["entries"].count > 0)
+              object.hasMandatoryUserFilter = true
+            else
+              object.hasMandatoryUserFilter = false
+            end
+            object.isFilterChecked = true
+            Storage.store_data
+          rescue => e
+            $log.error "There was some issues while checking Mandatory User Filters in #{object.old_project_pid} project!"
+            Storage.store_data
+          end
+        end
+      end
+    end
+    
+    def check_variables_in_projects
+      inf = Time.now.inspect + " checking variales in projects"
+      puts(inf)
+      $log.info inf
+      
+      Storage.object_collection.each do |object|
+        if !object.isVariableChecked
+          begin
+            pid = object.old_project_pid
+            json = GoodData.get("/gdc/md/#{pid}/query/prompts")
+            if (json["query"]["entries"].count > 0)
+              object.hasVariable = true
+            else
+              object.hasVariable = false
+            end
+            object.isVariableChecked = true
+            Storage.store_data
+          rescue => e
+            $log.error "There was some issues while checking Mandatory User Filters in #{object.old_project_pid} project!"
+            Storage.store_data            
+          end       
+        end
+      end
+    end    
+  
   end
-
-
-
-
 end
