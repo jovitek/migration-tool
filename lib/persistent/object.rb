@@ -13,6 +13,10 @@ module Migration
       "NEW"
     end
 
+    def self.TYPE_CHANGED
+      "TYPE_CHANGED"
+    end
+
 
     def self.IGNORE
       "IGNORE"
