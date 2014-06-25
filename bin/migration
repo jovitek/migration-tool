@@ -19,6 +19,26 @@ program_desc 'Program for project migration'
 desc "Debug output to STDOUT"
 switch [:d,:debug]
 
+desc 'Sanitize project'
+command :sanitize do |c|
+
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      $log.info Time.now.inspect + " - Sanitize job started"
+      puts(Time.now.inspect + " - Sanitize job started")
+
+      migration.load_source_data	  
+	  migration.execute_maql_sanitize
+	  migration.change_type_sanitize
+	  migration.execute_partial_sanitize
+	
+      migration.print_status
+      $log.info Time.now.inspect + ' - Sanitize job ended'
+      puts(Time.now.inspect + ' - Sanitize job ended')
+  end
+end
+
+
 desc 'Migrate project'
 command :start do |c|
 
