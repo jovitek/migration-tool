@@ -3,7 +3,7 @@ module Migration
 
   class Object
 
-    attr_accessor :old_project_pid,:new_project_pid,:status,:export_token,:export_status_url,:token_validity,:title,:summary,:import_status_url,:maql_update_task_id,:partial_metadata_task_id,:zendesk_sync_process,:type,:upload_finished,:uploads,:api_url,:zd_account,:isFilterChecked,:hasMandatoryUserFilter,:isVariableChecked,:hasVariable
+    attr_accessor :old_project_pid,:new_project_pid,:status,:export_token,:export_status_url,:token_validity,:title,:summary,:import_status_url,:maql_update_task_id,:partial_metadata_task_id,:zendesk_sync_process,:type,:upload_finished,:uploads,:api_url,:zd_account,:isFilterChecked,:hasMandatoryUserFilter,:isVariableChecked,:hasVariable,:rerun
 
     def self.VALID_TYPES
       ["migration","template"]

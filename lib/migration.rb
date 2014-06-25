@@ -1126,14 +1126,19 @@ module Migration
       Storage.object_collection.each do |object|
         if (object.status == Object.USER_CREATED)
 
-          json = {
-              "integration" => {
-                  "projectTemplate" => "/projectTemplates/ZendeskAnalytics/10",
-                  "active" => true
-              }
-          }
           begin
-            result = GoodData.post("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration", json)
+            json = {
+                "integration" => {
+                    "projectTemplate" => "/projectTemplates/ZendeskAnalytics/10",
+                    "active" => true
+                }
+            }
+
+            if (object.rerun.nil? or object.rerun == false)
+              result = GoodData.post("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration", json)
+            else
+              result = GoodData.put("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration", json)
+            end
             object.status = Object.INTEGRATION_CREATED
             Storage.store_data
           rescue RestClient::BadRequest => e
