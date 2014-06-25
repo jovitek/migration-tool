@@ -1,5 +1,5 @@
-require "GoodData"
-require "Time"
+require "gooddata"
+require "time"
 require "yaml"
 %w(storage object).each {|a| require "./lib/persistent/#{a}"}
 

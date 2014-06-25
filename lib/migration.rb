@@ -1157,6 +1157,22 @@ module Migration
     end
 
 
+    def dummy
+      Storage.object_collection.each do |object|
+        object.api_url = "https://" + object.zd_account + ".zendesk.com"
+       	pp object
+        if (object.status == Object.ENDPOINT_SET_FINISHED)
+            puts "Koks"
+            
+            object.rerun = true
+            object.new_project_pid = object.old_project_pid
+            object.status = Object.USER_CREATED
+        end        
+        Storage.store_data
+      end
+    end
+
+
     def create_endpoint
       inf = Time.now.inspect  + " - setting up ZD4 integrations"
       puts(inf)
@@ -1171,7 +1187,7 @@ module Migration
             }
           }
           begin
-            result = GoodData.put("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/settings", json)
+            #result = GoodData.put("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/settings", json)
             object.status = Object.ENDPOINT_SET
             Storage.store_data
           rescue RestClient::BadRequest => e
