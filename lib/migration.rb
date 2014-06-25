@@ -1193,7 +1193,7 @@ module Migration
       Storage.object_collection.each do |object|
         if (object.status == Object.ENDPOINT_SET)
           json = {
-              "process" => {}
+              "process" => {"incremental" => false}
           }
           begin
             result = GoodData.post("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/processes", json)
