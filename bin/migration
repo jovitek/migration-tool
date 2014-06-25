@@ -27,7 +27,8 @@ command :sanitize do |c|
       $log.info Time.now.inspect + " - Sanitize job started"
       puts(Time.now.inspect + " - Sanitize job started")
 
-      migration.load_source_data	  
+      migration.load_source_data
+      migration.connect_for_work	  
 	  migration.execute_maql_sanitize
 	  migration.change_type_sanitize
 	  migration.execute_partial_sanitize
