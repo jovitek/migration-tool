@@ -1187,7 +1187,7 @@ module Migration
             }
           }
           begin
-            #result = GoodData.put("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/settings", json)
+            result = GoodData.put("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/settings", json)
             object.status = Object.ENDPOINT_SET
             Storage.store_data
           rescue RestClient::BadRequest => e
