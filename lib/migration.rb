@@ -1280,6 +1280,7 @@ module Migration
       end
     end
     
+    
     def check_variables_in_projects
       inf = Time.now.inspect + " checking variales in projects"
       puts(inf)
@@ -1305,85 +1306,6 @@ module Migration
       end
     end  
     
-    def execute_maql_sanitize
-      connect_for_work()
-      inf = Time.now.inspect  + " - executing update maql"
-      fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
-      maql_source = File.read(@settings_maql_file)
-      Storage.object_collection.each do |object|
-        if (object.status == Object.NEW)
-          maql = {
-              "manage" => {
-                  "maql" => maql_source
-              }
-
-          }
-          begin
-            result = GoodData.post("/gdc/md/#{object.old_project_pid}/ldm/manage2", maql)
-            task_id = result["entries"].first["link"].match(/.*\/tasks\/(.*)\/status/)[1]
-            object.maql_update_task_id = task_id
-            object.status = Object.MAQL_REQUESTED
-            Storage.store_data
-          rescue RestClient::BadRequest => e
-            response = JSON.load(e.response)
-            $log.warn "The maql could not be applied on project #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
-          rescue RestClient::InternalServerError => e
-            response = JSON.load(e.response)
-            $log.warn "The maql could not be applied on project #{object.old_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
-          rescue => e
-            response = JSON.load(e.response)
-            $log.warn "Unknown error - The maql could not be applied on project #{object.old_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
-          end
-
-          while (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count >= @settings_number_simultanious_projects)
-            $log.info "Waiting till all MAQL is applied on all projects"
-            Storage.get_objects_by_status(Object.MAQL_REQUESTED).each do |for_check|
-              result = GoodData.get("/gdc/md/#{for_check.old_project_pid}/tasks/#{for_check.maql_update_task_id}/status")
-              status = result["wTaskStatus"]["status"]
-              if (status == 'OK')
-                $log.info "MAQL for project #{for_check.new_project_pid} successfully applied"
-                for_check.status = Object.MAQL
-                Storage.store_data
-              elsif  (status == "ERROR")
-                for_check.status = Object.NEW
-                Storage.store_data
-                $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
-              end
-            end
-
-            if (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count >= @settings_number_simultanious_projects)
-              $log.info "Waiting - START"
-              sleep(10)
-              $log.info "Waiting - STOP"
-            end
-          end
-        end
-      end
-
-      while (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count > 0)
-        $log.info "Waiting till all MAQL is applied on all projects"
-        Storage.get_objects_by_status(Object.MAQL_REQUESTED).each do |for_check|
-          result = GoodData.get("/gdc/md/#{for_check.old_project_pid}/tasks/#{for_check.maql_update_task_id}/status")
-          status = result["wTaskStatus"]["status"]
-          if (status == 'OK')
-            $log.info "MAQL for project #{for_check.new_project_pid} successfully applied"
-            for_check.status = Object.MAQL
-            Storage.store_data
-          elsif  (status == "ERROR")
-            for_check.status = Object.NEW
-            Storage.store_data
-            $log.error "Applying MAQL on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
-          end
-        end
-
-        if (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count > 0)
-          $log.info "Waiting - START"
-          sleep(10)
-          $log.info "Waiting - STOP"
-        end
-      end
-    end
-
     def change_type_sanitize
       Storage.object_collection.each do |object|
         if (object.status == Object.MAQL)
@@ -1425,6 +1347,114 @@ module Migration
         end
       end
     end
+    
+    
+    def rename_factofs_identifier
+      connect_for_work()
+      
+      inf = Time.now.inspect + " - executing the factof renaming"
+      Storage.object_collection.each do |object|
+        begin
+        # set a project pid
+        project_pid = object.old_project_pid
+        # use a GoodData project
+        GoodData.use project_pid
+        # read the factof element details
+        attr = GoodData::Attribute["attr.zendeskticketsbacklog.factsof"]
+        # obj check
+        obj = GoodData::get(attr.uri)
+        # rename object
+        obj["attribute"]["meta"]["identifier"] = "attr.zendeskticketsbacklog.ticketbackloghistory"
+        # push the change
+        GoodData.put(attr.uri, obj)
+        # update the persistent file
+        object.status = Object.TAGGED
+        # save the file
+        Storage.store_data
+        rescue => e
+          response = JSON.load(e.response)
+          $log.warn "The update of the identifier was not successful. Reason: #{response["error"]["message"]}"
+        end
+      end
+    end
+    
+    def execute_maql_sanitize      
+      inf = Time.now.inspect  + " - executing update maql"
+      fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
+      maql_source = File.read(@settings_maql_file)
+      Storage.object_collection.each do |object|
+        if (object.status == Object.TAGGED)
+          maql = {
+              "manage" => {
+                  "maql" => maql_source
+              }
+
+          }
+          begin
+            result = GoodData.post("/gdc/md/#{object.old_project_pid}/ldm/manage2", maql)
+            task_id = result["entries"].first["link"].match(/.*\/tasks\/(.*)\/status/)[1]
+            object.maql_update_task_id = task_id
+            object.status = Object.MAQL_REQUESTED
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.warn "The maql could not be applied on project #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.warn "The maql could not be applied on project #{object.old_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.warn "Unknown error - The maql could not be applied on project #{object.old_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
+          end
+
+          while (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count >= @settings_number_simultanious_projects)
+            $log.info "Waiting till all MAQL is applied on all projects"
+            Storage.get_objects_by_status(Object.MAQL_REQUESTED).each do |for_check|
+              result = GoodData.get("/gdc/md/#{for_check.old_project_pid}/tasks/#{for_check.maql_update_task_id}/status")
+              status = result["wTaskStatus"]["status"]
+              if (status == 'OK')
+                $log.info "MAQL for project #{for_check.old_project_pid} successfully applied"
+                for_check.status = Object.MAQL
+                Storage.store_data
+              elsif  (status == "ERROR")
+                for_check.status = Object.NEW
+                Storage.store_data
+                $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
+              end
+            end
+
+            if (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count >= @settings_number_simultanious_projects)
+              $log.info "Waiting - START"
+              sleep(10)
+              $log.info "Waiting - STOP"
+            end
+          end
+        end
+      end
+
+      while (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count > 0)
+        $log.info "Waiting till all MAQL is applied on all projects"
+        Storage.get_objects_by_status(Object.MAQL_REQUESTED).each do |for_check|
+          result = GoodData.get("/gdc/md/#{for_check.old_project_pid}/tasks/#{for_check.maql_update_task_id}/status")
+          status = result["wTaskStatus"]["status"]
+          if (status == 'OK')
+            $log.info "MAQL for project #{for_check.old_project_pid} successfully applied"
+            for_check.status = Object.MAQL
+            Storage.store_data
+          elsif  (status == "ERROR")
+            for_check.status = Object.NEW
+            Storage.store_data
+            $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
+          end
+        end
+
+        if (Storage.get_objects_by_status(Object.MAQL_REQUESTED).count > 0)
+          $log.info "Waiting - START"
+          sleep(10)
+          $log.info "Waiting - STOP"
+        end
+      end
+    end
 
     def execute_partial_sanitize
       inf = Time.now.inspect  + " - executing partial md import of the new dashboard"
@@ -1449,13 +1479,13 @@ module Migration
             Storage.store_data
           rescue RestClient::BadRequest => e
             response = JSON.load(e.response)
-            $log.error "The partial metadata could not be applied on project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+            $log.error "The partial metadata could not be applied on project #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
           rescue RestClient::InternalServerError => e
             response = JSON.load(e.response)
-            $log.error "The partial metadata could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
+            $log.error "The partial metadata could not be applied on project #{object.old_project_pid} and returned 500. Reason: #{response["error"]["message"]}"
           rescue => e
             response = JSON.load(e.response)
-            $log.error "Unknown error - The partial metadata could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{response["message"]}"
+            $log.error "Unknown error - The partial metadata could not be applied on project #{object.old_project_pid} and returned 500. Reason: #{response["message"]}"
           end
 
 
@@ -1465,13 +1495,13 @@ module Migration
               result = GoodData.get("/gdc/md/#{for_check.old_project_pid}/tasks/#{for_check.partial_metadata_task_id}/status")
               status = result["wTaskStatus"]["status"]
               if (status == 'OK')
-                $log.info "Partial Metadata for project #{for_check.new_project_pid} successfully applied"
+                $log.info "Partial Metadata for project #{for_check.old_project_pid} successfully applied"
                 for_check.status = Object.PARTIAL
                 Storage.store_data
               elsif  (status == "ERROR")
                 for_check.status = Object.TYPE_CHANGED
                 Storage.store_data
-                $log.error "Applying Partial Metadata on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
+                $log.error "Applying Partial Metadata on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
             end
 
@@ -1490,13 +1520,13 @@ module Migration
           result = GoodData.get("/gdc/md/#{for_check.old_project_pid}/tasks/#{for_check.partial_metadata_task_id}/status")
           status = result["wTaskStatus"]["status"]
           if (status == 'OK')
-            $log.info "Partial Metadata for project #{for_check.new_project_pid} successfully applied"
+            $log.info "Partial Metadata for project #{for_check.old_project_pid} successfully applied"
             for_check.status = Object.PARTIAL
             Storage.store_data
           elsif  (status == "ERROR")
             for_check.status = Object.TYPE_CHANGED
             Storage.store_data
-            $log.error "Applying Partial Metadata on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
+            $log.error "Applying Partial Metadata on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
         end
 
@@ -1508,7 +1538,55 @@ module Migration
       end
     end
     
-      
-  
+    def unlocking_metric_reports
+      inf = Time.now.inspect  + " - unlocking reports"
+      puts (inf)
+      $log.info inf
+      Storage.object_collection.each do |object|
+        if (object.status == Object.PARTIAL)
+          begin
+            # work with project
+            GoodData.project = object.old_project_pid         
+            # metrics change
+            metrics = GoodData::Metric[:all]
+            # iterate over
+            metrics.each do |metric|
+              # obj check
+              obj = GoodData::get(metric["link"])
+              # rename 
+              if (obj["metric"]["meta"]["locked"] == "1")
+                # change value
+                obj["metric"]["meta"]["locked"] == "0"
+                # push the change
+                GoodData.put(metric.link, obj)
+              end
+            end
+            
+            
+            # read all reports from the project
+            reports = GoodData::Report[:all]
+            # iterate over
+            reports.each do |report|
+              # obj check
+              obj = GoodData::get(report.uri)
+              # rename object in case of locked settings is true
+              if (obj["locked"] == "1")
+                # change the value
+                obj["locked"] = "0"
+                # push the change
+                GoodData.put(report.uri, obj)
+              end  
+              # update the persistent file
+              object.status = Object.FINISHED
+              # save the file
+              Storage.store_data
+            rescue => e
+              response = JSON.load(e.response)
+              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"
+            end
+          end
+        end        
+      end      
+    end
   end
 end
