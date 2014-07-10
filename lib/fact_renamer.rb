@@ -7,7 +7,7 @@ require 'pry'
 
 #GoodData.logging_on
 #con_res = GoodData.connect("josef.vitek@gooddata.com", "")
-con_res = GoodData.connect("gooddata2@zendesk.com", "KzaZE4hkve6w3ue&",{:server => 'https://analytics.zendesk.com'})
+con_res = GoodData.connect("gooddata2@zendesk.com", "",{:server => ''})
 
 X_HEADERS = ['project']
 CSV.open('file.csv', 'w') { |csv| csv<<X_HEADERS}
