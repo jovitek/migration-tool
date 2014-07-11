@@ -1156,7 +1156,9 @@ module Migration
       end
     end
 
-
+    
+    
+    
     def dummy
       Storage.object_collection.each do |object|
         object.api_url = "https://" + object.zd_account + ".zendesk.com"
