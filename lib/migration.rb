@@ -1345,10 +1345,11 @@ module Migration
                 # push the change
                 GoodData.put(report.uri, obj)
               end  
-              # update the persistent file
-              object.status = Object.FINISHED
-              # save the file
-              Storage.store_data
+            end
+            # update the persistent file
+            object.status = Object.FINISHED
+            # save the file
+            Storage.store_data
             rescue => e
               response = JSON.load(e.response)
               $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"
