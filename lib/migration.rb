@@ -557,7 +557,7 @@ module Migration
           #create.save
           createObj = GoodData.get(create.uri)
           createObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.createdat"
-          GoodData.put(create.uri, createObj)
+          obj(create.uri, createObj)
 
           update = GoodData::Fact["dt.zendesktickets.updatedat"]
           updateObj = GoodData.get(update.uri)
@@ -1553,11 +1553,11 @@ module Migration
               # obj check
               obj = GoodData::get(metric["link"])
               # rename 
-              if (obj["metric"]["meta"]["locked"] == "1")
+              if (obj["metric"]["meta"]["locked"] == 1)
                 # change value
-                obj["metric"]["meta"]["locked"] = "0"
+                obj["metric"]["meta"]["locked"] = 0
                 # push the change
-                GoodData.put(metric.link, obj)
+                GoodData.put(metric["link"], obj)
               end
             end
 
@@ -1566,13 +1566,13 @@ module Migration
             # iterate over
             reports.each do |report|
               # obj check
-              obj = GoodData::get(report.uri)
+              obj = GoodData::get(report["link"])
               # rename object in case of locked settings is true
-              if (obj["locked"] == "1")
+              if (obj["report"]["meta"]["locked"] == 1)
                 # change the value
-                obj["locked"] = "0"
+                obj["report"]["meta"]["locked"] = 0
                 # push the change
-                GoodData.put(report.uri, obj)
+                GoodData.put(report["link"], obj)
               end  
             end
             # update the persistent file
