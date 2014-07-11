@@ -1304,7 +1304,60 @@ module Migration
           end       
         end
       end
-    end  
+    end 
+    
+    
+    def unlocking_metric_reports
+      inf = Time.now.inspect  + " - unlocking reports"
+      puts (inf)
+      $log.info inf
+      Storage.object_collection.each do |object|
+        if (object.status == Object.NEW)
+          begin
+            # work with project
+            GoodData.project = object.old_project_pid         
+            # metrics change
+            metrics = GoodData::Metric[:all]
+            # iterate over
+            metrics.each do |metric|
+              # obj check
+              obj = GoodData::get(metric["link"])
+              # rename 
+              if (obj["metric"]["meta"]["locked"] == "1")
+                # change value
+                obj["metric"]["meta"]["locked"] == "0"
+                # push the change
+                GoodData.put(metric.link, obj)
+              end
+            end
+            
+            
+            # read all reports from the project
+            reports = GoodData::Report[:all]
+            # iterate over
+            reports.each do |report|
+              # obj check
+              obj = GoodData::get(report.uri)
+              # rename object in case of locked settings is true
+              if (obj["locked"] == "1")
+                # change the value
+                obj["locked"] = "0"
+                # push the change
+                GoodData.put(report.uri, obj)
+              end  
+              # update the persistent file
+              object.status = Object.FINISHED
+              # save the file
+              Storage.store_data
+            rescue => e
+              response = JSON.load(e.response)
+              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"
+            end
+          end
+        end        
+      end      
+    end
+     
     
     def change_type_sanitize
       Storage.object_collection.each do |object|
@@ -1538,55 +1591,6 @@ module Migration
       end
     end
     
-    def unlocking_metric_reports
-      inf = Time.now.inspect  + " - unlocking reports"
-      puts (inf)
-      $log.info inf
-      Storage.object_collection.each do |object|
-        if (object.status == Object.PARTIAL)
-          begin
-            # work with project
-            GoodData.project = object.old_project_pid         
-            # metrics change
-            metrics = GoodData::Metric[:all]
-            # iterate over
-            metrics.each do |metric|
-              # obj check
-              obj = GoodData::get(metric["link"])
-              # rename 
-              if (obj["metric"]["meta"]["locked"] == "1")
-                # change value
-                obj["metric"]["meta"]["locked"] == "0"
-                # push the change
-                GoodData.put(metric.link, obj)
-              end
-            end
-            
-            
-            # read all reports from the project
-            reports = GoodData::Report[:all]
-            # iterate over
-            reports.each do |report|
-              # obj check
-              obj = GoodData::get(report.uri)
-              # rename object in case of locked settings is true
-              if (obj["locked"] == "1")
-                # change the value
-                obj["locked"] = "0"
-                # push the change
-                GoodData.put(report.uri, obj)
-              end  
-              # update the persistent file
-              object.status = Object.FINISHED
-              # save the file
-              Storage.store_data
-            rescue => e
-              response = JSON.load(e.response)
-              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"
-            end
-          end
-        end        
-      end      
-    end
+    
   end
 end
