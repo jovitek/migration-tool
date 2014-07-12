@@ -75,7 +75,7 @@ command :run_integration do |c|
       migration.load_source_data
       migration.connect_for_work
       migration.create_integration
-      migration.create_endpoint
+      migration.create_endpoint_sanitize
       migration.run_integration
       migration.print_status
       $log.info Time.now.inspect + ' - Sanitize job ended'

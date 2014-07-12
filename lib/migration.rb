@@ -1161,11 +1161,7 @@ module Migration
     
     def dummy
       Storage.object_collection.each do |object|
-        object.api_url = "https://" + object.zd_account + ".zendesk.com"
-       	pp object
-        if (object.status == Object.ENDPOINT_SET_FINISHED)
-            puts "Koks"
-            
+        if (object.status == Object.PARTIAL)
             object.rerun = true
             object.new_project_pid = object.old_project_pid
             object.status = Object.USER_CREATED
@@ -1585,6 +1581,37 @@ module Migration
           rescue => e
             response = JSON.load(e.response)
             $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
+          end
+        end
+      end
+    end
+    
+    def create_endpoint_sanitize
+      inf = Time.now.inspect  + " - setting up ZD4 integrations"
+      puts(inf)
+      $log.info inf
+
+      Storage.object_collection.each do |object|
+        if (object.status == Object.INTEGRATION_CREATED)
+
+          json = {
+              "settings" => {
+                 "apiUrl" => object.api_url
+            }
+          }
+          begin
+            object.status = Object.ENDPOINT_SET
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.error "The zendesk endpoint for project #{object.new_project_pid} could not be created. Reason: #{response["error"]["message"]}"
+
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.error "The zendesk endpoint for project #{object.new_project_pid} could not be created. Returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.error "Unknown error - The zendesk endpoint for project #{object.new_project_pid} could not be created and returned 500."
           end
         end
       end
