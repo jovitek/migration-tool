@@ -1349,30 +1349,33 @@ module Migration
         end
       end
     end
+        
     
     def rename_factofs_identifier
       inf = Time.now.inspect + " - executing the factof renaming"
       Storage.object_collection.each do |object|
-        begin
-        # set a project pid
-        project_pid = object.old_project_pid
-        # use a GoodData project
-        GoodData.use project_pid
-        # read the factof element details
-        attr = GoodData::Attribute["attr.zendeskticketsbacklog.factsof"]
-        # obj check
-        obj = GoodData::get(attr.uri)
-        # rename object
-        obj["attribute"]["meta"]["identifier"] = "attr.zendeskticketsbacklog.ticketbackloghistory"
-        # push the change
-        GoodData.put(attr.uri, obj)
-        # update the persistent file
-        object.status = Object.TAGGED
-        # save the file
-        Storage.store_data
-        rescue => e
-          response = JSON.load(e.response)
-          $log.warn "The update of the identifier was not successful. Reason: #{response["error"]["message"]}"
+        if (object.status == Object.NEW)
+          begin
+            # set a project pid
+            project_pid = object.old_project_pid
+            # use a GoodData project
+            GoodData.use project_pid
+            # read the factof element details
+            attr = GoodData::Attribute["attr.zendeskticketsbacklog.factsof"]
+            # obj check
+            obj = GoodData::get(attr.uri)
+            # rename object
+            obj["attribute"]["meta"]["identifier"] = "attr.zendeskticketsbacklog.ticketbackloghistory"
+            # push the change
+            GoodData.put(attr.uri, obj)
+            # update the persistent file
+            object.status = Object.TAGGED
+            # save the file
+            Storage.store_data
+          rescue => e
+            response = JSON.load(e.response)
+            $log.warn "The update of the identifier was not successful. Reason: #{response["error"]["message"]}"
+          end
         end
       end
     end
@@ -1416,7 +1419,7 @@ module Migration
                 for_check.status = Object.MAQL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.NEW
+                for_check.status = Object.TAGGED
                 Storage.store_data
                 $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -1441,7 +1444,7 @@ module Migration
             for_check.status = Object.MAQL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.NEW
+            for_check.status = Object.TAGGED
             Storage.store_data
             $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
@@ -1462,7 +1465,7 @@ module Migration
 
       fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
       Storage.object_collection.each do |object|
-        if (object.status == Object.TYPE_CHANGED)
+        if (object.status == Object.MAQL)
           json = {
               "partialMDImport" => {
                   "token" => "#{@settings_import_token}",
@@ -1498,7 +1501,7 @@ module Migration
                 for_check.status = Object.PARTIAL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.TYPE_CHANGED
+                for_check.status = Object.MAQL
                 Storage.store_data
                 $log.error "Applying Partial Metadata on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -1523,7 +1526,7 @@ module Migration
             for_check.status = Object.PARTIAL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.TYPE_CHANGED
+            for_check.status = Object.MAQL
             Storage.store_data
             $log.error "Applying Partial Metadata on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
