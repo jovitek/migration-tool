@@ -93,7 +93,7 @@ command :sanitize do |c|
       puts(Time.now.inspect + " - Sanitize job started")
       migration.load_source_data
       migration.connect_for_work
-      migration.set_proper_status_sanitize
+      #migration.set_proper_status_sanitize
       migration.execute_maql_sanitize
       migration.load_dataset_sanitize
       #migration.change_type_sanitize

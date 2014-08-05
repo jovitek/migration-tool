@@ -1383,7 +1383,7 @@ module Migration
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
-        if (object.status == Object.TAGGED)
+        if (object.status == Object.NEW)
           maql = {
               "manage" => {
                   "maql" => maql_source
@@ -1417,7 +1417,7 @@ module Migration
                 for_check.status = Object.MAQL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.TAGGED
+                for_check.status = Object.NEW
                 Storage.store_data
                 $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -1442,7 +1442,7 @@ module Migration
             for_check.status = Object.MAQL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.TAGGED
+            for_check.status = Object.NEW
             Storage.store_data
             $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
@@ -1474,7 +1474,7 @@ module Migration
         end
         Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
           @settings_upload_files_sanitize.each do |file|
-            GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
+            GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.old_project_pid}/"})
           end
         end
 
@@ -1485,24 +1485,24 @@ module Migration
               new_upload = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_NEW}
               if (!new_upload.nil?)
                 json = {
-                    "pullIntegration" => "/#{object.new_project_pid}/#{new_upload["name"]}"
+                    "pullIntegration" => "/#{object.old_project_pid}/#{new_upload["name"]}"
                 }
                 begin
-                  res = GoodData.post("/gdc/md/#{object.new_project_pid}/etl/pull", json)
+                  res = GoodData.post("/gdc/md/#{object.old_project_pid}/etl/pull", json)
                   new_upload["uri"] = res["pullTask"]["uri"]
                   new_upload["status"] = Object.UPLOAD_RUNNING
                   running_task = new_upload
                 rescue RestClient::BadRequest => e
                   response = JSON.load(e.response)
                   new_upload["status"] = Object.UPLOAD_ERROR
-                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
                 rescue RestClient::InternalServerError => e
                   response = JSON.load(e.response)
                   new_upload["status"] = Object.UPLOAD_ERROR
-                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
                 rescue => e
                   new_upload["status"] = Object.UPLOAD_ERROR
-                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}.. Reason: Unknown reason"
+                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.old_project_pid}.. Reason: Unknown reason"
                 end
                 Storage.store_data
               else
@@ -1520,7 +1520,7 @@ module Migration
                 end
               rescue => e
                 running_task["status"] = Object.UPLOAD_ERROR
-                $log.warn "Upload of file #{running_task["name"]} has failed for project #{object.new_project_pid}. Reason: Unknown reason"
+                $log.warn "Upload of file #{running_task["name"]} has failed for project #{object.old_project_pid}. Reason: Unknown reason"
               end
               Storage.store_data
             end
@@ -1704,20 +1704,20 @@ module Migration
               "process" => {"incremental" => false}
           }
           begin
-            result = GoodData.post("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/processes", json)
+            result = GoodData.post("/gdc/projects/#{object.old_project_pid}/connectors/zendesk4/integration/processes", json)
             object.status = Object.ENDPOINT_SET_FINISHED
             object.zendesk_sync_process = result["uri"]
             Storage.store_data
           rescue RestClient::BadRequest => e
             response = JSON.load(e.response)
-            $log.error "The zendesk process for project #{object.new_project_pid} could not be started. Reason: #{response["error"]["message"]}"
+            $log.error "The zendesk process for project #{object.old_project_pid} could not be started. Reason: #{response["error"]["message"]}"
 
           rescue RestClient::InternalServerError => e
             response = JSON.load(e.response)
-            $log.error "The zendesk process for project #{object.new_project_pid} could not be started. Returned 500. Reason: #{response["error"]["message"]}"
+            $log.error "The zendesk process for project #{object.old_project_pid} could not be started. Returned 500. Reason: #{response["error"]["message"]}"
           rescue => e
             response = JSON.load(e.response)
-            $log.error "Unknown error - The zendesk process for project #{object.new_project_pid} could not be started and returned 500. Reason: #{response["message"]}"
+            $log.error "Unknown error - The zendesk process for project #{object.old_project_pid} could not be started and returned 500. Reason: #{response["message"]}"
           end
         end
       end
