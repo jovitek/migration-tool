@@ -34,6 +34,8 @@ module Migration
         @settings_project_template = json["settings"]["project_template"]
         @settings_color_palete = json["settings"]["color_palete"] || nil
         @settings_upload_files = json["settings"]["upload_files"]
+
+        @settings_upload_files_sanitize = json["settings"]["upload_files_sanitize"]
         @settings_domain = json["settings"]["domain"]
         @settings_user_to_add = json["settings"]["user_to_add"]
         @settings_project_name_prefix = json["settings"]["project_name_prefix"]
@@ -1453,6 +1455,79 @@ module Migration
         end
       end
     end
+
+
+    def load_dataset_sanitize
+
+        inf = Time.now.inspect  + " - uploading data to datasets"
+        puts(inf)
+        $log.info inf
+
+        connect_for_work()
+
+        # If we are not continuing, lets reset everything to beginning state
+        Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
+          object.uploads = []
+          @settings_upload_files_sanitize.each do |file|
+            object.uploads << {"name" => file.keys.first,"path" => file.values.first, "status" => Object.UPLOAD_NEW}
+          end
+        end
+        Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
+          @settings_upload_files_sanitize.each do |file|
+            GoodData.connection.upload(file.values.first,{:directory => file.keys.first,:staging_url => @connection_webdav +  "/uploads/#{object.new_project_pid}/"})
+          end
+        end
+
+        while (Storage.object_collection.find_all{|o| o.status == Object.MAQL }.count > 0)
+          Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
+            running_task = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_RUNNING}
+            if (running_task.nil?)
+              new_upload = object.uploads.find{|upload| upload["status"] == Object.UPLOAD_NEW}
+              if (!new_upload.nil?)
+                json = {
+                    "pullIntegration" => "/#{object.new_project_pid}/#{new_upload["name"]}"
+                }
+                begin
+                  res = GoodData.post("/gdc/md/#{object.new_project_pid}/etl/pull", json)
+                  new_upload["uri"] = res["pullTask"]["uri"]
+                  new_upload["status"] = Object.UPLOAD_RUNNING
+                  running_task = new_upload
+                rescue RestClient::BadRequest => e
+                  response = JSON.load(e.response)
+                  new_upload["status"] = Object.UPLOAD_ERROR
+                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+                rescue RestClient::InternalServerError => e
+                  response = JSON.load(e.response)
+                  new_upload["status"] = Object.UPLOAD_ERROR
+                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}. Reason: #{response["error"]["message"]}"
+                rescue => e
+                  new_upload["status"] = Object.UPLOAD_ERROR
+                  $log.warn "Upload of file #{new_upload["name"]} has failed for project #{object.new_project_pid}.. Reason: Unknown reason"
+                end
+                Storage.store_data
+              else
+                object.status = Object.FILE_UPLOAD_FINISHED
+                Storage.store_data
+              end
+            end
+            if (!running_task.nil?)
+              begin
+                response = GoodData.get(running_task["uri"])
+                if (response["taskStatus"] == "OK" || response["taskStatus"] == "WARNING")
+                  running_task["status"] = Object.UPLOAD_OK
+                elsif (response["taskStatus"] == "ERROR")
+                  running_task["status"] = Object.UPLOAD_ERROR
+                end
+              rescue => e
+                running_task["status"] = Object.UPLOAD_ERROR
+                $log.warn "Upload of file #{running_task["name"]} has failed for project #{object.new_project_pid}. Reason: Unknown reason"
+              end
+              Storage.store_data
+            end
+          end
+          sleep(5)
+        end
+    end
     
     def execute_partial_sanitize
       inf = Time.now.inspect  + " - executing partial md import of the new dashboard"
@@ -1461,7 +1536,7 @@ module Migration
 
       fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
       Storage.object_collection.each do |object|
-        if (object.status == Object.MAQL)
+        if (object.status == Object.UPLOAD_OK)
           json = {
               "partialMDImport" => {
                   "token" => "#{@settings_import_token}",
@@ -1497,7 +1572,7 @@ module Migration
                 for_check.status = Object.PARTIAL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.MAQL
+                for_check.status = Object.UPLOAD_OK
                 Storage.store_data
                 $log.error "Applying Partial Metadata on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -1616,6 +1691,47 @@ module Migration
         end
       end
     end
+
+
+    def run_integration_sanitize
+      inf = Time.now.inspect  + " - kicking off the ZD4 integrations"
+      puts(inf)
+      $log.info inf
+
+      Storage.object_collection.each do |object|
+        if (object.status == Object.PARTIAL)
+          json = {
+              "process" => {"incremental" => false}
+          }
+          begin
+            result = GoodData.post("/gdc/projects/#{object.new_project_pid}/connectors/zendesk4/integration/processes", json)
+            object.status = Object.ENDPOINT_SET_FINISHED
+            object.zendesk_sync_process = result["uri"]
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.error "The zendesk process for project #{object.new_project_pid} could not be started. Reason: #{response["error"]["message"]}"
+
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.error "The zendesk process for project #{object.new_project_pid} could not be started. Returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.error "Unknown error - The zendesk process for project #{object.new_project_pid} could not be started and returned 500. Reason: #{response["message"]}"
+          end
+        end
+      end
+    end
+
+    def set_proper_status_sanitize
+      Storage.object_collection.each do |object|
+        object.status = Object.TAGGED
+        Storage.store_data
+      end
+    end
+
+
+
 
 
   end

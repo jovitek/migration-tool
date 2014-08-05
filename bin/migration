@@ -92,10 +92,13 @@ command :sanitize do |c|
       $log.info Time.now.inspect + " - Sanitize job started"
       puts(Time.now.inspect + " - Sanitize job started")
       migration.load_source_data
-      migration.connect_for_work	  
+      migration.connect_for_work
+      migration.set_proper_status_sanitize
       migration.execute_maql_sanitize
-      migration.change_type_sanitize
+      migration.load_dataset_sanitize
+      #migration.change_type_sanitize
       migration.execute_partial_sanitize
+      migration.run_integration_sanitize
       migration.print_status
       $log.info Time.now.inspect + ' - Sanitize job ended'
       puts(Time.now.inspect + ' - Sanitize job ended')
