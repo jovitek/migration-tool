@@ -1536,7 +1536,7 @@ module Migration
 
       fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
       Storage.object_collection.each do |object|
-        if (object.status == Object.UPLOAD_OK)
+        if (object.status == Object.FILE_UPLOAD_FINISHED)
           json = {
               "partialMDImport" => {
                   "token" => "#{@settings_import_token}",
@@ -1703,7 +1703,14 @@ module Migration
           json = {
               "process" => {"incremental" => false}
           }
+          json2 = {
+              "integration" => {
+                      "projectTemplate" => "/projectTemplates/ZendeskAnalytics/10",
+                      "active" => true
+              }
+          }
           begin
+            result1 = GoodData.put("/gdc/projects/#{object.old_project_pid}/connectors/zendesk4/integration", json2)
             result = GoodData.post("/gdc/projects/#{object.old_project_pid}/connectors/zendesk4/integration/processes", json)
             object.status = Object.ENDPOINT_SET_FINISHED
             object.zendesk_sync_process = result["uri"]
