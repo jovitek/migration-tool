@@ -105,6 +105,19 @@ command :sanitize do |c|
   end
 end
 
+desc 'Export results'
+command :results do |c|
+
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      $log.info Time.now.inspect + " - Export job started"
+      puts(Time.now.inspect + " - Export job started")
+      migration.write_results
+      
+      puts(Time.now.inspect + ' - Export job ended')
+  end
+end
+
 
 desc 'Migrate project'
 command :start do |c|

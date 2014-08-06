@@ -1737,6 +1737,15 @@ module Migration
       end
     end
 
+    def write_results
+      CSV.open("result.csv", "wb") do |csv|
+        Storage.object_collection.each do |object|
+          csv << [object.old_project_pid,object.status]
+        end
+      end
+    end
+
+
 
 
 
