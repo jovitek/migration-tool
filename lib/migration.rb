@@ -152,11 +152,22 @@ module Migration
               }
           }
 
-          result = GoodData.post("/gdc/md/#{object.old_project_pid}/maintenance/export", export)
-          object.export_token = result['exportArtifact']['token']
-          object.export_status_url = result['exportArtifact']['status']['uri']
-          object.status = Object.CLONE_REQUESTED
-          Storage.store_data
+          begin
+            result = GoodData.post("/gdc/md/#{object.old_project_pid}/maintenance/export", export)
+            object.export_token = result['exportArtifact']['token']
+            object.export_status_url = result['exportArtifact']['status']['uri']
+            object.status = Object.CLONE_REQUESTED
+            Storage.store_data
+          rescue RestClient::BadRequest => e
+            response = JSON.load(e.response)
+            $log.warn "The export token could not be generated for pid: #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
+          rescue RestClient::InternalServerError => e
+            response = JSON.load(e.response)
+            $log.warn "The export token could not be generated for pid: #{object.old_project_pid}. and returned 500. Reason: #{response["error"]["message"]}"
+          rescue => e
+            response = JSON.load(e.response)
+            $log.warn "Unknown error - The export token could not be generated for pid: #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
+          end
         end
 
         while (Storage.get_objects_by_status(Object.CLONE_REQUESTED).count >= @settings_number_simultanious_projects)
