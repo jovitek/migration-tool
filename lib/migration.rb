@@ -559,7 +559,7 @@ module Migration
           #create.save
           createObj = GoodData.get(create.uri)
           createObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.createdat"
-          obj(create.uri, createObj)
+          GoodData.put(create.uri, createObj)
 
           update = GoodData::Fact["dt.zendesktickets.updatedat"]
           updateObj = GoodData.get(update.uri)
@@ -576,7 +576,10 @@ module Migration
           duedateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.duedate"
           GoodData.put(duedate.uri, duedateObj)
 
+          puts "kozy"
+
           initiallyassignedat = GoodData::Fact["dt.zendesktickets.initiallyassignedat"]
+          puts "vozy"
           initiallyassignedatObj = GoodData.get(initiallyassignedat.uri)
           initiallyassignedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.initiallyassignedat"
           GoodData.put(initiallyassignedat.uri, initiallyassignedatObj)
@@ -714,6 +717,7 @@ module Migration
       Storage.object_collection.each do |object|
         if (object.status == Object.FILE_UPLOAD_FINISHED and !@settings_color_palete.nil?)
           begin
+            pp object.new_project_pid
             result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
             if (object.status = Object.COLOR_TEMPLATE and object.type == "migration")
               object.status = Object.COLOR_TEMPLATE
@@ -1738,13 +1742,21 @@ module Migration
     end
 
     def write_results
-      CSV.open("result.csv", "wb") do |csv|
+      CSV.open("result.csv", "w") do |csv|
         Storage.object_collection.each do |object|
           csv << [object.old_project_pid,object.status]
         end
       end
     end
 
+    def set_file_upload_status
+      Storage.object_collection.each do |object|
+        if  object.status != 'PARTIAL' 
+          object.status = Object.FILE_UPLOAD_FINISHED
+          Storage.store_data
+        end
+      end
+    end
 
 
 
