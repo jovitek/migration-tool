@@ -173,16 +173,21 @@ module Migration
         while (Storage.get_objects_by_status(Object.CLONE_REQUESTED).count >= @settings_number_simultanious_projects)
           $log.info "Waiting till all export token are generated"
           Storage.get_objects_by_status(Object.CLONE_REQUESTED).each do |for_check|
-            state = GoodData.get(for_check.export_status_url)['taskState']['status']
-            if (state == 'OK')
-              $log.info "Token for #{for_check.old_project_pid} successfully created"
-              for_check.status = Object.CLONED
-              Storage.store_data
-            elsif  (state == "ERROR")
-              for_check.status = Object.NEW
-              Storage.store_data
-              $log.error "Generating export token for pid #{for_check.old_project_pid} has failed - please restart"
+            begin
+              state = GoodData.get(for_check.export_status_url)['taskState']['status']
+              if (state == 'OK')
+                $log.info "Token for #{for_check.old_project_pid} successfully created"
+                for_check.status = Object.CLONED
+                Storage.store_data
+              elsif  (state == "ERROR")
+                for_check.status = Object.NEW
+                Storage.store_data
+                $log.error "Generating export token for pid #{for_check.old_project_pid} has failed - please restart"
+              end
+            rescue => e
+              $log.error "Generating export token for pid #{for_check.old_project_pid} has failed on ETL pool - please restart"
             end
+
           end
 
           if (Storage.get_objects_by_status(Object.CLONE_REQUESTED).count >= @settings_number_simultanious_projects)
@@ -197,15 +202,19 @@ module Migration
       while (Storage.get_objects_by_status(Object.CLONE_REQUESTED).count > 0)
         $log.info "Waiting till all export token are generated"
         Storage.get_objects_by_status(Object.CLONE_REQUESTED).each do |for_check|
-          state = GoodData.get(for_check.export_status_url)['taskState']['status']
-          if (state == 'OK')
-            $log.info "Token for #{for_check.old_project_pid} successfully created"
-            for_check.status = Object.CLONED
-            Storage.store_data
-          elsif  (state == "ERROR")
-            for_check.status = Object.NEW
-            Storage.store_data
-            $log.error "Generating export token for pid #{for_check.old_project_pid} has failed"
+          begin
+            state = GoodData.get(for_check.export_status_url)['taskState']['status']
+            if (state == 'OK')
+              $log.info "Token for #{for_check.old_project_pid} successfully created"
+              for_check.status = Object.CLONED
+              Storage.store_data
+            elsif  (state == "ERROR")
+              for_check.status = Object.NEW
+              Storage.store_data
+              $log.error "Generating export token for pid #{for_check.old_project_pid} has failed - please restart"
+            end
+          rescue => e
+            $log.error "Generating export token for pid #{for_check.old_project_pid} has failed on ETL pool - please restart"
           end
         end
         if (Storage.get_objects_by_status(Object.CLONE_REQUESTED).count > 0)
