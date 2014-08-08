@@ -161,17 +161,23 @@ module Migration
           rescue RestClient::BadRequest => e
             response = JSON.load(e.response)
             $log.warn "The export token could not be generated for pid: #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
+            object.status == Object.NEW
           rescue RestClient::InternalServerError => e
             response = JSON.load(e.response)
             $log.warn "The export token could not be generated for pid: #{object.old_project_pid}. and returned 500. Reason: #{response["error"]["message"]}"
+            object.status == Object.NEW
           rescue => e
             response = JSON.load(e.response)
             $log.warn "Unknown error - The export token could not be generated for pid: #{object.old_project_pid}. Reason: #{response["error"]["message"]}"
+            object.status = Object.NEW
           end
         end
 
         while (Storage.get_objects_by_status(Object.CLONE_REQUESTED).count >= @settings_number_simultanious_projects)
           $log.info "Waiting till all export token are generated"
+
+          puts "prdel"
+
           Storage.get_objects_by_status(Object.CLONE_REQUESTED).each do |for_check|
             begin
               state = GoodData.get(for_check.export_status_url)['taskState']['status']
@@ -180,6 +186,7 @@ module Migration
                 for_check.status = Object.CLONED
                 Storage.store_data
               elsif  (state == "ERROR")
+                puts "prdel2"
                 for_check.status = Object.NEW
                 Storage.store_data
                 $log.error "Generating export token for pid #{for_check.old_project_pid} has failed - please restart"
@@ -596,10 +603,8 @@ module Migration
           duedateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.duedate"
           GoodData.put(duedate.uri, duedateObj)
 
-          puts "kozy"
 
           initiallyassignedat = GoodData::Fact["dt.zendesktickets.initiallyassignedat"]
-          puts "vozy"
           initiallyassignedatObj = GoodData.get(initiallyassignedat.uri)
           initiallyassignedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.initiallyassignedat"
           GoodData.put(initiallyassignedat.uri, initiallyassignedatObj)
@@ -611,7 +616,7 @@ module Migration
           object.status = Object.RENAME_DATE_FACT
           Storage.store_data
         else 
-          object.status = Object.FILE_UPLOAD_FINISHED
+          #object.status = Object.FILE_UPLOAD_FINISHED
         end
 
       end
@@ -735,9 +740,8 @@ module Migration
       $log.info inf
 
       Storage.object_collection.each do |object|
-        if (object.status == Object.FILE_UPLOAD_FINISHED and !@settings_color_palete.nil?)
+        if (object.status == Object.FILE_UPLOAD_FINISHED and !@settings_color_palete.nil? and !object.new_project_pid.nil?)
           begin
-            pp object.new_project_pid
             result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
             if (object.status = Object.COLOR_TEMPLATE and object.type == "migration")
               object.status = Object.COLOR_TEMPLATE
