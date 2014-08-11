@@ -1767,6 +1767,7 @@ module Migration
 
     def write_results
       CSV.open("result.csv", "w", :row_sep => "\n") do |csv|
+        csv << ["old","pid","status"]
         Storage.object_collection.each do |object|
           if object.new_project_pid
              csv << [object.old_project_pid,object.new_project_pid,object.status]
