@@ -581,38 +581,45 @@ module Migration
         if (object.status == Object.TAGGED && object.type != "template")
           GoodData.project = object.new_project_pid
 
-          create = GoodData::Fact["dt.zendesktickets.createdat"]
-          #create.identifier = "fact.zendesktickets.createdat"
-          #create.save
-          createObj = GoodData.get(create.uri)
-          createObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.createdat"
-          GoodData.put(create.uri, createObj)
+          begin
+            create = GoodData::Fact["dt.zendesktickets.createdat"]
+            #create.identifier = "fact.zendesktickets.createdat"
+            #create.save
+            createObj = GoodData.get(create.uri)
+            createObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.createdat"
+            GoodData.put(create.uri, createObj)
 
-          update = GoodData::Fact["dt.zendesktickets.updatedat"]
-          updateObj = GoodData.get(update.uri)
-          updateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.updatedat"
-          GoodData.put(update.uri, updateObj)
+            update = GoodData::Fact["dt.zendesktickets.updatedat"]
+            updateObj = GoodData.get(update.uri)
+            updateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.updatedat"
+            GoodData.put(update.uri, updateObj)
 
-          assign = GoodData::Fact["dt.zendesktickets.assignedat"]
-          assignObj = GoodData.get(assign.uri)
-          assignObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.assignedat"
-          GoodData.put(assign.uri, assignObj)
+            assign = GoodData::Fact["dt.zendesktickets.assignedat"]
+            assignObj = GoodData.get(assign.uri)
+            assignObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.assignedat"
+            GoodData.put(assign.uri, assignObj)
 
-          duedate = GoodData::Fact["dt.zendesktickets.duedate"]
-          duedateObj = GoodData.get(duedate.uri)
-          duedateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.duedate"
-          GoodData.put(duedate.uri, duedateObj)
+            duedate = GoodData::Fact["dt.zendesktickets.duedate"]
+            duedateObj = GoodData.get(duedate.uri)
+            duedateObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.duedate"
+            GoodData.put(duedate.uri, duedateObj)
 
 
-          initiallyassignedat = GoodData::Fact["dt.zendesktickets.initiallyassignedat"]
-          initiallyassignedatObj = GoodData.get(initiallyassignedat.uri)
-          initiallyassignedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.initiallyassignedat"
-          GoodData.put(initiallyassignedat.uri, initiallyassignedatObj)
+            initiallyassignedat = GoodData::Fact["dt.zendesktickets.initiallyassignedat"]
+            initiallyassignedatObj = GoodData.get(initiallyassignedat.uri)
+            initiallyassignedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.initiallyassignedat"
+            GoodData.put(initiallyassignedat.uri, initiallyassignedatObj)
 
-          solvedat = GoodData::Fact["dt.zendesktickets.solvedat"]
-          solvedatObj = GoodData.get(solvedat.uri)
-          solvedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.solvedat"
-          GoodData.put(solvedat.uri, solvedatObj)
+            solvedat = GoodData::Fact["dt.zendesktickets.solvedat"]
+            solvedatObj = GoodData.get(solvedat.uri)
+            solvedatObj["fact"]["meta"]["identifier"] = "fact.zendesktickets.solvedat"
+            GoodData.put(solvedat.uri, solvedatObj)
+          rescue => e
+            pp e
+          end
+
+
+
           object.status = Object.RENAME_DATE_FACT
           Storage.store_data
         else 
