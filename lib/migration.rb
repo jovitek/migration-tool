@@ -1699,34 +1699,38 @@ module Migration
             # end
             begin
               insightsdash = GoodData::Dashboard['aC3zM52niDXP']
+              if insightsdash
+                uri = insightsdash.meta["uri"]
+                obj = GoodData::get(uri)
+                obj["projectDashboard"]["meta"]["locked"] = 1
+                GoodData.put(uri, obj)
 
-              uri = insightsdash.meta["uri"]
-              obj = GoodData::get(uri)
-              obj["projectDashboard"]["meta"]["locked"] = 1
-              GoodData.put(uri, obj)
+                met = insightsdash.using.select { |o| o['category'] == 'metric' }
+                rep = insightsdash.using.select { |o| o['category'] == 'report' }
 
-              met = insightsdash.using.select { |o| o['category'] == 'metric' }
-              rep = insightsdash.using.select { |o| o['category'] == 'report' }
+                met.each {|m| 
+                  obj = GoodData::get(m["link"])
+                  # rename 
+                  # change value
+                  obj["metric"]["meta"]["locked"] = 1
+                  # push the change
+                  GoodData.put(m["link"], obj)
 
-              met.each {|m| 
-                obj = GoodData::get(m["link"])
-                # rename 
-                # change value
-                obj["metric"]["meta"]["locked"] = 1
-                # push the change
-                GoodData.put(m["link"], obj)
+                }
+                   
+                rep.each {|r| 
+                  obj = GoodData::get(r["link"])
+                  # rename 
+                  # change value
+                  obj["report"]["meta"]["locked"] = 1
+                  # push the change
+                  GoodData.put(r["link"], obj)
 
-              }
-                 
-              rep.each {|r| 
-                obj = GoodData::get(r["link"])
-                # rename 
-                # change value
-                obj["report"]["meta"]["locked"] = 1
-                # push the change
-                GoodData.put(r["link"], obj)
-
-              }
+                }
+                object.status = Object.FINISHED
+              else
+                object.status = Object.NEW
+              end
             rescue => e
               object.status = Object.NEW
               response = JSON.load(e.response)
@@ -1735,7 +1739,7 @@ module Migration
 
 
             # update the persistent file
-            object.status = Object.FINISHED
+            #object.status = Object.FINISHED
             # save the file
             Storage.store_data        
           rescue => e
