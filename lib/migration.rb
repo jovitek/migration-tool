@@ -1697,36 +1697,41 @@ module Migration
             #     GoodData.put(dashboard["link"], obj)
             #   end  
             # end
+            begin
+              insightsdash = GoodData::Dashboard['aC3zM52niDXP']
 
-            insightsdash = GoodData::Dashboard['aC3zM52niDXP']
+              uri = insightsdash.meta["uri"]
+              obj = GoodData::get(uri)
+              obj["projectDashboard"]["meta"]["locked"] = 1
+              GoodData.put(uri, obj)
 
-            uri = insightsdash.meta["uri"]
-            obj = GoodData::get(uri)
-            obj["projectDashboard"]["meta"]["locked"] = 1
-            GoodData.put(uri, obj)
+              met = insightsdash.using.select { |o| o['category'] == 'metric' }
+              rep = insightsdash.using.select { |o| o['category'] == 'report' }
 
-            met = insightsdash.using.select { |o| o['category'] == 'metric' }
-            rep = insightsdash.using.select { |o| o['category'] == 'report' }
+              met.each {|m| 
+                obj = GoodData::get(m["link"])
+                # rename 
+                # change value
+                obj["metric"]["meta"]["locked"] = 1
+                # push the change
+                GoodData.put(m["link"], obj)
 
-            met.each {|m| 
-              obj = GoodData::get(m["link"])
-              # rename 
-              # change value
-              obj["metric"]["meta"]["locked"] = 1
-              # push the change
-              GoodData.put(m["link"], obj)
+              }
+                 
+              rep.each {|r| 
+                obj = GoodData::get(r["link"])
+                # rename 
+                # change value
+                obj["report"]["meta"]["locked"] = 1
+                # push the change
+                GoodData.put(r["link"], obj)
 
-            }
-               
-            rep.each {|r| 
-              obj = GoodData::get(r["link"])
-              # rename 
-              # change value
-              obj["report"]["meta"]["locked"] = 1
-              # push the change
-              GoodData.put(r["link"], obj)
-
-            }
+              }
+            rescue => e
+              object.status = Object.NEW
+              response = JSON.load(e.response)
+              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
+            end
 
 
             # update the persistent file
