@@ -1658,32 +1658,77 @@ module Migration
             # metrics change
             metrics = GoodData::Metric[:all]
             # iterate over
-            metrics.each do |metric|
+            metrics.select  {|metric| metric["locked"] == 1 }.each {|m| 
               # obj check
-              obj = GoodData::get(metric["link"])
+              obj = GoodData::get(m["link"])
               # rename 
-              if (obj["metric"]["meta"]["locked"] == 1)
-                # change value
-                obj["metric"]["meta"]["locked"] = 0
-                # push the change
-                GoodData.put(metric["link"], obj)
-              end
-            end
+              # change value
+              obj["metric"]["meta"]["locked"] = 0
+              # push the change
+              GoodData.put(m["link"], obj)
+              
+            }
 
             # read all reports from the project
             reports = GoodData::Report[:all]
             # iterate over
-            reports.each do |report|
+            reports.select  {|report| report["locked"] == 1}.each { |r| 
               # obj check
-              obj = GoodData::get(report["link"])
+              obj = GoodData::get(r["link"])
               # rename object in case of locked settings is true
-              if (obj["report"]["meta"]["locked"] == 1)
+              
                 # change the value
                 obj["report"]["meta"]["locked"] = 0
                 # push the change
-                GoodData.put(report["link"], obj)
-              end  
-            end
+                GoodData.put(r["link"], obj)
+                
+            }
+
+            # dashboards = GoodData::Dashboard[:all]
+            # # iterate over
+            # dashboards.each do |dashboard|
+            #   # obj check
+            #   obj = GoodData::get(dashboard["link"])
+            #   # rename object in case of locked settings is true
+            #   if (obj["projectDashboard"]["meta"]["locked"] == 1)
+            #     # change the value
+            #     obj["projectDashboard"]["meta"]["locked"] = 0
+            #     # push the change
+            #     GoodData.put(dashboard["link"], obj)
+            #   end  
+            # end
+
+            insightsdash = GoodData::Dashboard['aC3zM52niDXP']
+
+            uri = insightsdash.meta["uri"]
+            obj = GoodData::get(uri)
+            obj["projectDashboard"]["meta"]["locked"] = 1
+            GoodData.put(uri, obj)
+
+            met = insightsdash.using.select { |o| o['category'] == 'metric' }
+            rep = insightsdash.using.select { |o| o['category'] == 'report' }
+
+            met.each {|m| 
+              obj = GoodData::get(m["link"])
+              # rename 
+              # change value
+              obj["metric"]["meta"]["locked"] = 1
+              # push the change
+              GoodData.put(m["link"], obj)
+
+            }
+               
+            rep.each {|r| 
+              obj = GoodData::get(r["link"])
+              # rename 
+              # change value
+              obj["report"]["meta"]["locked"] = 1
+              # push the change
+              GoodData.put(r["link"], obj)
+
+            }
+
+
             # update the persistent file
             object.status = Object.FINISHED
             # save the file
