@@ -1652,10 +1652,11 @@ module Migration
       $log.info inf
       Storage.object_collection.each do |object|
         if (object.status == Object.NEW)
+          pid = object.old_project_pid
           begin
             # work with project
-            GoodData.project = object.old_project_pid         
-            # metrics change
+            GoodData.use pid         
+            #metrics change
             metrics = GoodData::Metric[:all]
             # iterate over
             metrics.select  {|metric| metric["locked"] == 1 }.each {|m| 
@@ -1697,16 +1698,24 @@ module Migration
             #     GoodData.put(dashboard["link"], obj)
             #   end  
             # end
-            begin
-              insightsdash = GoodData::Dashboard['aC3zM52niDXP']
-              if insightsdash
-                uri = insightsdash.meta["uri"]
+            
+             
+              #insightsdash = GoodData::Dashboard['aC3zM52niDXP']
+              dashs =  GoodData::get("/gdc/md/#{pid}/query/projectdashboards")["query"]["entries"]
+
+              insightsdash = dashs.select { |d| d["identifier"]== 'aC3zM52niDXP' }
+
+              if !insightsdash.empty?
+
+                id = GoodData::Dashboard['aC3zM52niDXP']
+                uri = insightsdash.first["link"]
                 obj = GoodData::get(uri)
                 obj["projectDashboard"]["meta"]["locked"] = 1
+
                 GoodData.put(uri, obj)
 
-                met = insightsdash.using.select { |o| o['category'] == 'metric' }
-                rep = insightsdash.using.select { |o| o['category'] == 'report' }
+                met = id.using.select { |o| o['category'] == 'metric' }
+                rep = id.using.select { |o| o['category'] == 'report' }
 
                 met.each {|m| 
                   obj = GoodData::get(m["link"])
@@ -1730,19 +1739,17 @@ module Migration
                 object.status = Object.FINISHED
               else
                 object.status = Object.NEW
+                $log.warn "No default dashboard present. PID: #{pid}"
               end
-            rescue => e
-              object.status = Object.NEW
-              response = JSON.load(e.response)
-              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
-            end
-
+            
 
             # update the persistent file
             #object.status = Object.FINISHED
             # save the file
             Storage.store_data        
           rescue => e
+            object.status = Object.NEW
+            Storage.store_data
             response = JSON.load(e.response)
             $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
           end
