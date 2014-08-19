@@ -1651,108 +1651,111 @@ module Migration
       puts (inf)
       $log.info inf
       Storage.object_collection.each do |object|
-        if (object.status == Object.NEW)
+        if (object.status == Object.NEW && (object.old_project_pid!=''|| object.old_project_pid != nil))
+          #puts object.old_project_pid
+
           pid = object.old_project_pid
-          begin
-            # work with project
-            GoodData.use pid         
-            #metrics change
-            metrics = GoodData::Metric[:all]
-            # iterate over
-            metrics.select  {|metric| metric["locked"] == 1 }.each {|m| 
-              # obj check
-              obj = GoodData::get(m["link"])
-              # rename 
-              # change value
-              obj["metric"]["meta"]["locked"] = 0
-              # push the change
-              GoodData.put(m["link"], obj)
-              
-            }
+            begin
+              # work with project
 
-            # read all reports from the project
-            reports = GoodData::Report[:all]
-            # iterate over
-            reports.select  {|report| report["locked"] == 1}.each { |r| 
-              # obj check
-              obj = GoodData::get(r["link"])
-              # rename object in case of locked settings is true
-              
-                # change the value
-                obj["report"]["meta"]["locked"] = 0
-                # push the change
-                GoodData.put(r["link"], obj)
+              GoodData.use pid         
+              #metrics change
+              # metrics = GoodData::Metric[:all]
+              # # iterate over
+              # metrics.select  {|metric| metric["locked"] == 1 }.each {|m| 
+              #   # obj check
+              #   obj = GoodData::get(m["link"])
+              #   # rename 
+              #   # change value
+              #   obj["metric"]["meta"]["locked"] = 0
+              #   # push the change
+              #   GoodData.put(m["link"], obj)
                 
-            }
+              # }
 
-            # dashboards = GoodData::Dashboard[:all]
-            # # iterate over
-            # dashboards.each do |dashboard|
-            #   # obj check
-            #   obj = GoodData::get(dashboard["link"])
-            #   # rename object in case of locked settings is true
-            #   if (obj["projectDashboard"]["meta"]["locked"] == 1)
-            #     # change the value
-            #     obj["projectDashboard"]["meta"]["locked"] = 0
-            #     # push the change
-            #     GoodData.put(dashboard["link"], obj)
-            #   end  
-            # end
-            
-             
-              #insightsdash = GoodData::Dashboard['aC3zM52niDXP']
-              dashs =  GoodData::get("/gdc/md/#{pid}/query/projectdashboards")["query"]["entries"]
+              # # read all reports from the project
+              # reports = GoodData::Report[:all]
+              # # iterate over
+              # reports.select  {|report| report["locked"] == 1}.each { |r| 
+              #   # obj check
+              #   obj = GoodData::get(r["link"])
+              #   # rename object in case of locked settings is true
+                
+              #     # change the value
+              #     obj["report"]["meta"]["locked"] = 0
+              #     # push the change
+              #     GoodData.put(r["link"], obj)
+                  
+              # }
 
-              insightsdash = dashs.select { |d| d["identifier"]== 'aC3zM52niDXP' }
-
-              if !insightsdash.empty?
-
-                id = GoodData::Dashboard['aC3zM52niDXP']
-                uri = insightsdash.first["link"]
-                obj = GoodData::get(uri)
-                obj["projectDashboard"]["meta"]["locked"] = 1
-
-                GoodData.put(uri, obj)
-
-                met = id.using.select { |o| o['category'] == 'metric' }
-                rep = id.using.select { |o| o['category'] == 'report' }
-
-                met.each {|m| 
-                  obj = GoodData::get(m["link"])
-                  # rename 
-                  # change value
-                  obj["metric"]["meta"]["locked"] = 1
+              dashboards = GoodData::Dashboard[:all]
+              # iterate over
+              dashboards.each do |dashboard|
+                # obj check
+                obj = GoodData::get(dashboard["link"])
+                # rename object in case of locked settings is true
+                if (obj["projectDashboard"]["meta"]["locked"] == 1)
+                  # change the value
+                  obj["projectDashboard"]["meta"]["locked"] = 0
                   # push the change
-                  GoodData.put(m["link"], obj)
-
-                }
-                   
-                rep.each {|r| 
-                  obj = GoodData::get(r["link"])
-                  # rename 
-                  # change value
-                  obj["report"]["meta"]["locked"] = 1
-                  # push the change
-                  GoodData.put(r["link"], obj)
-
-                }
-                object.status = Object.FINISHED
-              else
-                object.status = Object.NEW
-                $log.warn "No default dashboard present. PID: #{pid}"
+                  GoodData.put(dashboard["link"], obj)
+                end  
               end
-            
+              
+               
+                #insightsdash = GoodData::Dashboard['aC3zM52niDXP']
+                dashs =  GoodData::get("/gdc/md/#{pid}/query/projectdashboards")["query"]["entries"]
 
-            # update the persistent file
-            #object.status = Object.FINISHED
-            # save the file
-            Storage.store_data        
-          rescue => e
-            object.status = Object.NEW
-            Storage.store_data
-            response = JSON.load(e.response)
-            $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
-          end
+                insightsdash = dashs.select { |d| d["identifier"]== 'aC3zM52niDXP' }
+
+                if !insightsdash.empty?
+
+                  id = GoodData::Dashboard['aC3zM52niDXP']
+                  uri = insightsdash.first["link"]
+                  obj = GoodData::get(uri)
+                  obj["projectDashboard"]["meta"]["locked"] = 1
+
+                  GoodData.put(uri, obj)
+
+                  met = id.using.select { |o| o['category'] == 'metric' }
+                  rep = id.using.select { |o| o['category'] == 'report' }
+
+                  met.each {|m| 
+                    obj = GoodData::get(m["link"])
+                    # rename 
+                    # change value
+                    obj["metric"]["meta"]["locked"] = 1
+                    # push the change
+                    GoodData.put(m["link"], obj)
+
+                  }
+                     
+                  rep.each {|r| 
+                    obj = GoodData::get(r["link"])
+                    # rename 
+                    # change value
+                    obj["report"]["meta"]["locked"] = 1
+                    # push the change
+                    GoodData.put(r["link"], obj)
+
+                  }
+                  object.status = Object.FINISHED
+                else
+                  object.status = Object.NEW
+                  $log.warn "No default dashboard present. PID: #{pid}"
+                end
+              
+
+              # update the persistent file
+              #object.status = Object.FINISHED
+              # save the file
+              Storage.store_data        
+            rescue => e
+              object.status = Object.NEW
+              Storage.store_data
+              response = JSON.load(e.response)
+              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
+            end
         end
       end
     end
