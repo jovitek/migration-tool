@@ -1660,33 +1660,33 @@ module Migration
 
               GoodData.use pid         
               #metrics change
-              # metrics = GoodData::Metric[:all]
-              # # iterate over
-              # metrics.select  {|metric| metric["locked"] == 1 }.each {|m| 
-              #   # obj check
-              #   obj = GoodData::get(m["link"])
-              #   # rename 
-              #   # change value
-              #   obj["metric"]["meta"]["locked"] = 0
-              #   # push the change
-              #   GoodData.put(m["link"], obj)
+              metrics = GoodData::Metric[:all]
+              # iterate over
+              metrics.select  {|metric| metric["locked"] == 1 }.each {|m| 
+                # obj check
+                obj = GoodData::get(m["link"])
+                # rename 
+                # change value
+                obj["metric"]["meta"]["locked"] = 0
+                # push the change
+                GoodData.put(m["link"], obj)
                 
-              # }
+              }
 
-              # # read all reports from the project
-              # reports = GoodData::Report[:all]
-              # # iterate over
-              # reports.select  {|report| report["locked"] == 1}.each { |r| 
-              #   # obj check
-              #   obj = GoodData::get(r["link"])
-              #   # rename object in case of locked settings is true
+              # read all reports from the project
+              reports = GoodData::Report[:all]
+              # iterate over
+              reports.select  {|report| report["locked"] == 1}.each { |r| 
+                # obj check
+                obj = GoodData::get(r["link"])
+                # rename object in case of locked settings is true
                 
-              #     # change the value
-              #     obj["report"]["meta"]["locked"] = 0
-              #     # push the change
-              #     GoodData.put(r["link"], obj)
+                  # change the value
+                  obj["report"]["meta"]["locked"] = 0
+                  # push the change
+                  GoodData.put(r["link"], obj)
                   
-              # }
+              }
 
               dashboards = GoodData::Dashboard[:all]
               # iterate over
