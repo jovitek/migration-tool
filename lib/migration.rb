@@ -1289,6 +1289,32 @@ module Migration
     end
     
     
+    def check_schedules_in_projects
+      inf = Time.now.inspect + " checking schedules in projects"
+      puts(inf)
+      $log.info inf
+
+      Storage.object_collection.each do |object|
+        if !object.isScheduleChecked
+          begin
+            pid = object.old_project_pid
+            json = GoodData.get("/gdc/md/#{pid}/query/scheduledmails")
+            if (json["query"]["entries"].count > 0)
+              object.hasSchedule = true
+            else
+              object.hasSchedule = false
+            end
+            object.isScheduleChecked = true
+            Storage.store_data
+          rescue => e
+            $log.error "There was some issues while checking Schedules in #{object.old_project_pid} project!"
+            Storage.store_data
+          end
+        end
+      end
+    end
+    
+    
     
     def check_mufs_in_projects
       inf = Time.now.inspect + " checking mandatory user filters in projects"

@@ -19,6 +19,24 @@ program_desc 'Program for project migration'
 desc "Debug output to STDOUT"
 switch [:d,:debug]
 
+
+desc 'Scheduled mails project'
+command :schedules_list do |c|
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      $log.info Time.now.inspect + " - Scheduled job started"
+      puts(Time.now.inspect + " - Scheduled job started")
+      migration.load_source_data
+      migration.connect_for_export
+	  migration.check_schedules_in_projects	
+      migration.print_status
+      $log.info Time.now.inspect + ' - Scheduled job ended'
+      puts(Time.now.inspect + ' - Scheduled job ended')
+  end
+end
+
+
+
 desc 'Unlock project'
 command :unlock do |c|
   c.action do |global_options,options,args|
