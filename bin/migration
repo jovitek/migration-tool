@@ -169,6 +169,24 @@ command :start do |c|
 end
 
 
+
+desc 'ZD4 Fix'
+command :zd4fix do |c|
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      $log.info Time.now.inspect + " - Migration job started"
+      puts(Time.now.inspect + " - Migration job started")
+      migration.load_source_data
+	  migration.connect_for_work
+	  migration.execute_partial_zd4_fix
+	  migration.execute_maql_zd4_fix
+      migration.print_status
+      $log.info Time.now.inspect + ' - Migraton job ended'
+      puts(Time.now.inspect + ' - Migraton job ended')
+  end
+end
+
+
 desc 'Upload datasets'
 command :upload do |c|
 
