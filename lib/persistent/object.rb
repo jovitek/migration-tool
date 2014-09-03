@@ -16,8 +16,13 @@ module Migration
     def self.TYPE_CHANGED
       "TYPE_CHANGED"
     end
-
-
+    
+    
+    def self.GEO_TYPE_CHANGED
+      "GEO_TYPE_CHANGED"
+    end
+    
+    
     def self.IGNORE
       "IGNORE"
     end

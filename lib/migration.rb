@@ -629,6 +629,49 @@ module Migration
       end
     end
 
+    
+    def change_type
+      Storage.object_collection.each do |object|
+        if (object.status == Object.COLOR_TEMPLATE)
+          begin
+            # change country
+            request = {
+                "identifierToUri" => ["label.ticketupdate.country"]
+            }
+
+            response = GoodData.post("/gdc/md/#{object.new_project_pid}/identifiers", request)
+            if (response["identifiers"].count > 0)
+              url = response["identifiers"].first["uri"]
+              json = GoodData.get(url)
+
+              json["attributeDisplayForm"]["content"]["type"] = "GDC.geo.worldcountries.name"
+              response = GoodData.post(url, json)
+            end
+
+            # change pin
+            request = {
+                "identifierToUri" => ["label.ticketupdate.geopushpin"]
+            }
+
+            response = GoodData.post("/gdc/md/#{object.new_project_pid}/identifiers", request)
+            if (response["identifiers"].count > 0)
+              url = response["identifiers"].first["uri"]
+              json = GoodData.get(url)
+
+              json["attributeDisplayForm"]["content"]["type"] = "GDC.geo.pin"
+              response = GoodData.post(url, json)
+            end
+
+            object.status = Object.GEO_TYPE_CHANGED
+            Storage.store_data
+          rescue => e
+            object.status = Object.COLOR_TEMPLATE
+            Storage.store_data
+          end
+        end
+      end
+    end
+
 
     def upload_file(continue = false)
       inf = Time.now.inspect  + " - uploading data to datasets"
@@ -780,7 +823,7 @@ module Migration
 
       fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
       Storage.object_collection.each do |object|
-        if (object.status == Object.COLOR_TEMPLATE)
+        if (object.status == Object.GEO_TYPE_CHANGED)
           json = {
               "partialMDImport" => {
                   "token" => "#{@settings_import_token}",
@@ -817,7 +860,7 @@ module Migration
                 for_check.status = Object.PARTIAL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.COLOR_TEMPLATE
+                for_check.status = Object.GEO_TYPE_CHANGED
                 Storage.store_data
                 $log.error "Applying Partial Metadata on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -841,7 +884,7 @@ module Migration
             for_check.status = Object.PARTIAL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.COLOR_TEMPLATE
+            for_check.status = Object.GEO_TYPE_CHANGED
             Storage.store_data
             $log.error "Applying Partial Metadata on project #{for_check.new_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end

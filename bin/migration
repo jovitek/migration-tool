@@ -155,6 +155,8 @@ command :start do |c|
       migration.execute_maql
       migration.upload_file
       migration.apply_color_template
+      # added method change_type (due to geomaps) before execute partial
+      migration.change_type
       migration.execute_partial
       migration.swap_labels
       migration.swap_label_dash_filters
