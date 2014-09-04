@@ -52,23 +52,6 @@ command :unlock do |c|
   end
 end
 
-desc 'Unlock project'
-command :update do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Unlock job started"
-      puts(Time.now.inspect + " - Unlock job started")
-      migration.load_source_data
-      migration.connect_for_work
-	  migration.rename_factofs_identifier
-	  migration.execute_maql_sanitize
-	  migration.execute_partial_sanitize
-      migration.print_status
-      $log.info Time.now.inspect + ' - Unlock job ended'
-      puts(Time.now.inspect + ' - Unlock job ended')
-  end
-end
-
 desc 'Dummy project'
 command :dummy_run do |c|
   c.action do |global_options,options,args|
@@ -171,6 +154,25 @@ command :start do |c|
 end
 
 
+desc 'Update project'
+command :update do |c|
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      $log.info Time.now.inspect + " - Unlock job started"
+      puts(Time.now.inspect + " - Unlock job started")
+      migration.load_source_data
+      migration.connect_for_work
+	  migration.rename_factofs_identifier
+	  migration.execute_maql_sanitize
+	  migration.change_type_sanitize;
+	  migration.execute_partial_sanitize
+      migration.print_status
+      $log.info Time.now.inspect + ' - Unlock job ended'
+      puts(Time.now.inspect + ' - Unlock job ended')
+  end
+end
+
+
 
 desc 'ZD4 Fix'
 command :zd4fix do |c|
@@ -181,6 +183,7 @@ command :zd4fix do |c|
       migration.load_source_data
 	  migration.connect_for_work
 	  migration.execute_partial_zd4_fix
+	  
 	  migration.execute_maql_zd4_fix
       migration.print_status
       $log.info Time.now.inspect + ' - Migraton job ended'
