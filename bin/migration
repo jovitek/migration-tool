@@ -163,7 +163,7 @@ command :update do |c|
       migration.load_source_data
       migration.connect_for_work
 	    migration.execute_maql_sanitize
-	    migration.change_type_sanitize;
+	    migration.change_type_sanitize
 	    migration.execute_partial_sanitize
       migration.print_status
       $log.info Time.now.inspect + ' - Unlock job ended'
