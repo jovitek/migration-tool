@@ -1444,7 +1444,7 @@ module Migration
       fail "Cannot find MAQL file" if !File.exist?(@settings_maql_file)
       maql_source = File.read(@settings_maql_file)
       Storage.object_collection.each do |object|
-        if (object.status == Object.TAGGED)
+        if (object.status == Object.NEW)
           maql = {
               "manage" => {
                   "maql" => maql_source
@@ -1478,7 +1478,7 @@ module Migration
                 for_check.status = Object.MAQL
                 Storage.store_data
               elsif  (status == "ERROR")
-                for_check.status = Object.TAGGED
+                for_check.status = Object.NEW
                 Storage.store_data
                 $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
               end
@@ -1503,7 +1503,7 @@ module Migration
             for_check.status = Object.MAQL
             Storage.store_data
           elsif  (status == "ERROR")
-            for_check.status = Object.TAGGED
+            for_check.status = Object.NEW
             Storage.store_data
             $log.error "Applying MAQL on project #{for_check.old_project_pid} has failed - please restart \n Message: #{result["wTaskStatus"]["messages"]}"
           end
