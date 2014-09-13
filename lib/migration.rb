@@ -632,7 +632,7 @@ module Migration
     
     def change_type
       Storage.object_collection.each do |object|
-        if (object.status == Object.COLOR_TEMPLATE)
+        if (object.status == Object.COLOR_TEMPLATE && object.type !="template")
           begin
             # change country
             request = {
@@ -668,6 +668,10 @@ module Migration
             object.status = Object.COLOR_TEMPLATE
             Storage.store_data
           end
+        elsif (object.type ="template")
+          object.status = Object.SWAP_LABELS_DASHBOARD
+          Storage.store_data
+
         end
       end
     end
