@@ -176,7 +176,6 @@ module Migration
         while (Storage.get_objects_by_status(Object.CLONE_REQUESTED).count >= @settings_number_simultanious_projects)
           $log.info "Waiting till all export token are generated"
 
-          puts "prdel"
 
           Storage.get_objects_by_status(Object.CLONE_REQUESTED).each do |for_check|
             begin
@@ -1160,6 +1159,7 @@ module Migration
       Storage.object_collection.each do |object|
         if (object.status == Object.SWAP_LABELS_DASHBOARD)
 
+          begin
           #Get roles in current project
           project = GoodData::Project[object.new_project_pid]
           # lets find the connector role
@@ -1186,7 +1186,7 @@ module Migration
               }
               }
 
-          begin
+          
             GoodData.post("/gdc/projects/#{object.new_project_pid}/users",json)
             object.status = Object.USER_CREATED
             Storage.store_data
