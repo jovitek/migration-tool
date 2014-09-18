@@ -631,6 +631,10 @@ module Migration
 
     
     def change_type
+      inf = Time.now.inspect  + " - updating GEO attribute types"
+      puts(inf)
+      $log.info inf
+
       Storage.object_collection.each do |object|
         if (object.status == Object.COLOR_TEMPLATE && object.type !="template")
           begin
@@ -828,6 +832,7 @@ module Migration
       fail "The partial metada import token is empty" if @settings_import_token.nil? or @settings_import_token == ""
       Storage.object_collection.each do |object|
         if (object.status == Object.GEO_TYPE_CHANGED)
+
           json = {
               "partialMDImport" => {
                   "token" => "#{@settings_import_token}",
