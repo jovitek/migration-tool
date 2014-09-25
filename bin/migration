@@ -122,7 +122,6 @@ end
 
 desc 'Migrate project'
 command :start do |c|
-
   c.action do |global_options,options,args|
       migration = Migration::MigrationTasks.new()
       $log.info Time.now.inspect + " - Migration job started"
@@ -132,6 +131,35 @@ command :start do |c|
       migration.get_export_tokens_projects
       migration.create_projects
       migration.import_projects
+      migration.tag_entities
+      migration.rename_date_facts
+      migration.fix_date_facts
+      migration.execute_maql
+      migration.upload_file
+      migration.apply_color_template
+      # added method change_type (due to geomaps) before execute partial
+      migration.change_type
+      migration.execute_partial
+      migration.swap_labels
+      migration.swap_label_dash_filters
+      migration.create_user
+      migration.create_integration
+      migration.create_endpoint
+      migration.run_integration
+      migration.print_status
+      $log.info Time.now.inspect + ' - Migraton job ended'
+      puts(Time.now.inspect + ' - Migraton job ended')
+  end
+end
+
+desc 'Migrate project'
+command :start_fix do |c|
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      $log.info Time.now.inspect + " - Migration job started"
+      puts(Time.now.inspect + " - Migration job started")
+      migration.load_source_data
+      migration.connect_for_work
       migration.tag_entities
       migration.rename_date_facts
       migration.fix_date_facts
@@ -182,7 +210,6 @@ command :zd4fix do |c|
       migration.load_source_data
 	  migration.connect_for_work
 	  migration.execute_partial_zd4_fix
-	  
 	  migration.execute_maql_zd4_fix
       migration.print_status
       $log.info Time.now.inspect + ' - Migraton job ended'

@@ -1251,9 +1251,10 @@ module Migration
     def dummy
       Storage.object_collection.each do |object|
         if (object.status == Object.PARTIAL)
-            object.rerun = true
+            #object.rerun = true
             object.new_project_pid = object.old_project_pid
-            object.status = Object.USER_CREATED
+            #object.status = Object.USER_CREATED
+            object.status = Object.IMPORTED
         end        
         Storage.store_data
       end
