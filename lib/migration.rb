@@ -671,10 +671,9 @@ module Migration
             object.status = Object.COLOR_TEMPLATE
             Storage.store_data
           end
-        elsif (object.type ="template")
+        elsif (object.type == "template")
           object.status = Object.SWAP_LABELS_DASHBOARD
           Storage.store_data
-
         end
       end
     end
