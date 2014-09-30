@@ -131,6 +131,7 @@ command :start do |c|
       migration.get_export_tokens_projects
       migration.create_projects
       migration.import_projects
+      migration.unlocking_all
       migration.tag_entities
       migration.rename_date_facts
       migration.fix_date_facts
