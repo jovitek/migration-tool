@@ -470,7 +470,7 @@ module Migration
       $log.info inf
 
       Storage.object_collection.each do |object|
-        if (object.status == Object.IMPORTED)
+        if (object.status == Object.UNLOCKED)
           begin
             GoodData.with_project(object.new_project_pid) do |project|
               metrics = GoodData::Metric[:all].map { |meta|  GoodData::Metric[meta['link']]}
