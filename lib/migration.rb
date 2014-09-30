@@ -370,10 +370,6 @@ module Migration
         end
       end
 
-
-
-
-
       while (Storage.get_objects_by_status(Object.IMPORT_REQUESTED).count > 0)
         $log.info "Waiting till all project tokens are imported"
         Storage.get_objects_by_status(Object.IMPORT_REQUESTED).each do |for_check|
@@ -394,6 +390,76 @@ module Migration
           $log.info "Waiting - STOP"
         end
       end
+    end
+
+
+    def unlocking_all
+      inf = Time.now.inspect  + " - unlocking objects"
+      puts (inf)
+      $log.info inf
+      Storage.object_collection.each do |object|
+        if (object.status == Object.IMPORTED and object.type == "migration")
+          #puts object.old_project_pid
+
+          pid = object.new_project_pid
+            begin
+              # work with project
+              GoodData.use pid         
+              #metrics change
+              metrics = GoodData::Metric[:all]
+              # iterate over
+              metrics.select  {|metric| metric["locked"] == 1 }.each {|m| 
+                # obj check
+                obj = GoodData::get(m["link"])
+                # rename 
+                # change value
+                obj["metric"]["meta"]["locked"] = 0
+                # push the change
+                GoodData.put(m["link"], obj)
+                
+              }
+
+              # read all reports from the project
+              reports = GoodData::Report[:all]
+              # iterate over
+              reports.select  {|report| report["locked"] == 1}.each { |r| 
+                # obj check
+                obj = GoodData::get(r["link"])
+                # rename object in case of locked settings is true
+                
+                  # change the value
+                  obj["report"]["meta"]["locked"] = 0
+                  # push the change
+                  GoodData.put(r["link"], obj)
+                  
+              }
+
+              dashboards = GoodData::Dashboard[:all]
+              # iterate over
+              dashboards.each do |dashboard|
+                # obj check
+                obj = GoodData::get(dashboard["link"])
+                # rename object in case of locked settings is true
+                if (obj["projectDashboard"]["meta"]["locked"] == 1)
+                  # change the value
+                  obj["projectDashboard"]["meta"]["locked"] = 0
+                  # push the change
+                  GoodData.put(dashboard["link"], obj)
+                end  
+              end
+              
+              # update the persistent file
+              object.status = Object.UNLOCKED
+              # save the file
+              Storage.store_data        
+            rescue => e
+              object.status = Object.IMPORTED
+              Storage.store_data
+              response = JSON.load(e.response)
+              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
+            end      
+          end
+        end
     end
 
 
@@ -1654,7 +1720,6 @@ module Migration
 
 
     def load_dataset_sanitize
-
         inf = Time.now.inspect  + " - uploading data to datasets"
         puts(inf)
         $log.info inf

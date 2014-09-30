@@ -54,6 +54,14 @@ module Migration
     def self.TAGGED
       "TAGGED"
     end
+    
+    def self.UNLOCKED
+      "UNLOCKED"
+    end
+    
+    def self.CREATED_FROM_TEMPLATE
+      "CREATED_FROM_TEMPLATE"
+    end
 
     def self.MAQL_REQUESTED
       "MAQL_REQUESTED"
