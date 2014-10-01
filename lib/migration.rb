@@ -95,7 +95,34 @@ module Migration
         end
       end
     end
+    
+    def load_source_data_for_domain_renaming
+      inf = Time.now.inspect  + " - loading source data from csv"
+      puts(inf)
+      $log.info inf
 
+      fail "Project file don't exists" if !File.exists?(@settings_project_file)
+      pids = []
+      CSV.foreach(@settings_project_file, {:headers => true, :skip_blanks => true}) do |csv_obj|
+        pids.push({"pid" => csv_obj["project_pid"], "old_domain" => csv_obj["set"], "new_domain" => csv_obj["needs_to_be_set"]})
+      end
+      pids.uniq! {|p| p["pid"]}
+      pids.each do |hash|
+        object = Storage.get_object_by_old_project_pid(hash["pid"])
+        if (object.nil?)
+          object = Object.new()
+
+          object.old_project_pid = hash["pid"]
+         
+          fail "The project type |#{hash["type"]}| for pid #{hash["pid"]} is not valid. Valid types: #{Object.VALID_TYPES.join(",")}" if Object.VALID_TYPES.find{|t| t == hash["type"]}.nil?
+          object.type = hash["type"]
+          object.old_domain = hash["old_domain"]
+          object.new_domain = hash["new_domain"]
+          object.status = Object.NEW
+          Storage.store_data
+        end
+      end
+    end
 
     def load_data
       inf = Time.now.inspect + " - fetching connector settings from Z3 projects"
