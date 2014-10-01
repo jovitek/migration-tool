@@ -116,6 +116,26 @@ module Migration
           object.old_domain = hash["old_domain"]
           object.new_domain = hash["new_domain"]
           object.status = Object.NEW
+          Storage.add_object(object)
+          Storage.store_data
+        end
+      end
+    end
+    
+    
+    def import_projects
+      inf = Time.now.inspect  + " - renaming domains"
+      puts(inf)
+      $log.info inf
+      Storage.object_collection.each do |object|
+        if (object.status == Object.NEW)
+          json_update = {
+            :settings => {
+              :apiUrl => object.new_domain
+            }
+          }
+          GoodData.put("/gdc/projects/#{object.old_project_pid}/connectors/zendesk3/integration/config/settings", json_update)
+          object.status = Object.FINISHED
           Storage.store_data
         end
       end
