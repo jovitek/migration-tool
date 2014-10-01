@@ -113,9 +113,6 @@ module Migration
           object = Object.new()
 
           object.old_project_pid = hash["pid"]
-         
-          fail "The project type |#{hash["type"]}| for pid #{hash["pid"]} is not valid. Valid types: #{Object.VALID_TYPES.join(",")}" if Object.VALID_TYPES.find{|t| t == hash["type"]}.nil?
-          object.type = hash["type"]
           object.old_domain = hash["old_domain"]
           object.new_domain = hash["new_domain"]
           object.status = Object.NEW
