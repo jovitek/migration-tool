@@ -226,7 +226,8 @@ command :zd_rename_domain do |c|
       $log.info Time.now.inspect + " - Migration job started"
       puts(Time.now.inspect + " - Migration job started")
       migration.load_source_data_for_domain_renaming
-	  
+	  migration.connect_for_export
+	  migration.import_projects
       migration.print_status
       $log.info Time.now.inspect + ' - Migraton job ended'
       puts(Time.now.inspect + ' - Migraton job ended')
