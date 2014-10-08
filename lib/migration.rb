@@ -1504,6 +1504,38 @@ module Migration
       end
     end
     
+    def check_existence_of_facts
+      inf = Time.now.inspect + " checking existence of fact.zendesktickets.resolutiontime in projects"
+      $log.info inf
+      Storage.object_collection.each do |object|
+        if (object.status == Object.NEW)
+          begin
+            # set a project pid
+            project_pid = object.old_project_pid
+            # use a GoodData project
+            GoodData.use project_pid
+            # get obj detail
+            obj = GoodData::Fact["fact.zendesktickets.resolutiontime"]
+            # get the usedby array
+            metrics_array = obj.usedby.select {|o| o['category'] == 'metric'}
+            # check if there is any metric
+            if (metrics_array.count > 0)
+              object.metric_exists = true
+            else
+              object.metric_exists = false
+            end
+            object.are_metrics_checked = true
+            object.status = Object.TYPE_CHANGED
+            # save the file
+            Storage.store_data
+          rescue => e
+            response = JSON.load(e.response)
+            $log.warn "The update of report was not successful. Reason: #{response["error"]["message"]}"
+          end
+        end
+      end
+    end
+    
     
     def check_variables_in_projects
       inf = Time.now.inspect + " checking variales in projects"
