@@ -2,7 +2,7 @@
 #
 # (c) 2014 GoodData corporation
 
-require "GoodData"
+require "gooddata"
 require "Time"
 require "yaml"
 %w(storage object).each {|a| require "./lib/persistent/#{a}"}
