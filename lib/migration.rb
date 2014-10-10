@@ -1519,7 +1519,7 @@ module Migration
             # get the fact uri
             resolution_time_fact_uri = resolution_time_fact.uri
             # get list of metric where resolution time fact is used 
-            metrics_array = fact_id.usedby.select {|o| o['category'] == 'metric'}
+            metrics_array = resolution_time_fact.usedby.select {|o| o['category'] == 'metric'}
             # iterate over array with metrics
             metrics_array.each do |metric|
               # get the metric obj by geting the link

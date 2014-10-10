@@ -226,7 +226,7 @@ command :fact_check do |c|
       puts(Time.now.inspect + " - Migration job started")
       migration.load_source_data
 	  migration.connect_for_work
-      migration.check_existence_of_facts
+      migration.update_of_fact_value
       migration.print_status
       $log.info Time.now.inspect + ' - Migraton job ended'
       puts(Time.now.inspect + ' - Migraton job ended')
