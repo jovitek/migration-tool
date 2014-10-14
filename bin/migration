@@ -171,6 +171,8 @@ command :start_fix do |c|
       migration.execute_partial
       migration.swap_labels
       migration.swap_label_dash_filters
+      # this will update a value of metric when a metric with "fact.zendesktickets.resolutiontime"fact is uded
+      migration.update_of_fact_value
       migration.create_user
       migration.create_integration
       migration.create_endpoint

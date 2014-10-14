@@ -92,11 +92,15 @@ module Migration
     def self.SWAP_LABELS
       "SWAP_LABELS"
     end
+    
 
     def self.SWAP_LABELS_DASHBOARD
       "SWAP_LABELS_DASHBOARD"
     end
-
+    
+    def self.METRIC_CHANGED
+      "METRIC_CHANGED"
+    end
 
     def self.PARTIAL_REQUESTED
       "PARTIAL_REQUESTED"

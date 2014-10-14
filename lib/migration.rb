@@ -1251,11 +1251,57 @@ module Migration
               dd.save
             end
           end
-          object.status = Object.SWAP_LABELS_DASHBOARD
+          object.status = Object.METRIC_CHANGED
           Storage.store_data
         end
       end
     end
+    
+    def update_of_fact_value
+      inf = Time.now.inspect + "update of metric where fact.zendesktickets.resolutiontime appears"
+      $log.info inf
+      Storage.object_collection.each do |object|
+        if (object.status == Object.SWAP_LABELS_DASHBOARD)
+          begin
+            # set a project pid
+            project_pid = object.new_project_pid
+            # use GD project
+            GoodData.use project_pid
+            # read fact information
+            resolution_time_fact = GoodData::Fact["fact.zendesktickets.resolutiontime"]
+            # get the fact uri
+            resolution_time_fact_uri = resolution_time_fact.uri
+            # get list of metric where resolution time fact is used 
+            metrics_array = resolution_time_fact.usedby.select {|o| o['category'] == 'metric'}
+            # iterate over array with metrics
+            metrics_array.each do |metric|
+              # get the metric obj by geting the link
+              metric_obj = GoodData.get(metric["link"])
+              # old_expression == original_metric
+              old_expression =  "[" + resolution_time_fact_uri.to_s + "]"
+              # check if the fact is in place
+              if metric_obj["metric"]["content"]["expression"].include?(old_expression)
+                # new expression == original_metric / 60
+                new_expression = old_expression + " / 60"
+                # replace the value
+                metric_obj["metric"]["content"]["expression"].gsub!(old_expression, new_expression)
+                # get the uri
+                uri = metric_obj["metric"]["meta"]["uri"]
+                # replace the resource
+                GoodData.put(uri, metric_obj)
+              end
+            end
+            object.status = Object.METRIC_CHANGED
+            # save the file
+            Storage.store_data
+          rescue => e
+            response = JSON.load(e.response)
+            $log.warn "The update of report was not successful. Reason: #{response["error"]["message"]}"
+          end
+        end
+      end
+    end
+    
 
     def create_user
       inf = Time.now.inspect  + " - creating connector users"
@@ -1267,7 +1313,7 @@ module Migration
       users = GoodData::Domain.users(@settings_domain)
       user_entity = users.find{|u| u.login == @settings_user_to_add}
       Storage.object_collection.each do |object|
-        if (object.status == Object.SWAP_LABELS_DASHBOARD && object.new_project_pid)
+        if (object.status == Object.METRIC_CHANGED && object.new_project_pid)
 
 
           #Get roles in current project
@@ -1499,51 +1545,6 @@ module Migration
           rescue => e
             $log.error "There was some issues while checking Mandatory User Filters in #{object.old_project_pid} project!"
             Storage.store_data
-          end
-        end
-      end
-    end
-    
-    def update_of_fact_value
-      inf = Time.now.inspect + "update of metric where fact.zendesktickets.resolutiontime appears"
-      $log.info inf
-      Storage.object_collection.each do |object|
-        if (object.status == Object.NEW)
-          begin
-            # set a project pid
-            project_pid = object.old_project_pid
-            # use GD project
-            GoodData.use project_pid
-            # read fact information
-            resolution_time_fact = GoodData::Fact["fact.zendesktickets.resolutiontime"]
-            # get the fact uri
-            resolution_time_fact_uri = resolution_time_fact.uri
-            # get list of metric where resolution time fact is used 
-            metrics_array = resolution_time_fact.usedby.select {|o| o['category'] == 'metric'}
-            # iterate over array with metrics
-            metrics_array.each do |metric|
-              # get the metric obj by geting the link
-              metric_obj = GoodData.get(metric["link"])
-              # old_expression == original_metric
-              old_expression =  "[" + resolution_time_fact_uri.to_s + "]"
-              # check if the fact is in place
-              if metric_obj["metric"]["content"]["expression"].include?(old_expression)
-                # new expression == original_metric / 60
-                new_expression = old_expression + " / 60"
-                # replace the value
-                metric_obj["metric"]["content"]["expression"].gsub!(old_expression, new_expression)
-                # get the uri
-                uri = metric_obj["metric"]["meta"]["uri"]
-                # replace the resource
-                GoodData.put(uri, metric_obj)
-              end
-            end
-            object.status = Object.TYPE_CHANGED
-            # save the file
-            Storage.store_data
-          rescue => e
-            response = JSON.load(e.response)
-            $log.warn "The update of report was not successful. Reason: #{response["error"]["message"]}"
           end
         end
       end
