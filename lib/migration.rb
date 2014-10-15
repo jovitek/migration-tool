@@ -499,6 +499,9 @@ module Migration
             rescue => e
               object.status = Object.IMPORTED
               Storage.store_data
+
+              pp e
+
               response = JSON.load(e.response)
               $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
             end      
