@@ -527,7 +527,9 @@ module Migration
                   x.tags =  x.tags + " migrated"
                   x.save
                 rescue
-                  $log.warn "Unable to tag metric: " + x.uri
+                  
+                  $log.warn "Unable to tag metric: "
+                  # + x.link
                 end 
 
               end
@@ -541,11 +543,12 @@ module Migration
                 
                 begin
                   metric = GoodData::Metric[x]
-                #  pp metric
+                  
                   metric.tags = metric.tags + " migrated_checkSat"
                   metric.save
                 rescue
-                  $log.warn "Unable to tag metric: " + x.uri
+                  $log.warn "Unable to tag metric: "
+                  # + x.link
                 end 
               }
              
@@ -594,7 +597,7 @@ module Migration
             $log.warn "Tagging metrics for #{object.new_project_pid}  has failed and returned 500. Reason: #{response["error"]["message"]}"
           rescue => e
             pp e
-            $log.warn "Unknown error - The maql could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{e.message}"
+            $log.warn "Unknown error - The MAQL could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{e.message}"
           end
         end
 
