@@ -783,7 +783,7 @@ module Migration
             Storage.store_data
           end
         elsif (object.type == "template")
-          object.status = Object.SWAP_LABELS_DASHBOARD
+          object.status = Object.METRIC_CHANGED
           Storage.store_data
         end
       end
@@ -913,7 +913,7 @@ module Migration
             if (object.status = Object.COLOR_TEMPLATE and object.type == "migration")
               object.status = Object.COLOR_TEMPLATE
             elsif (object.status = Object.COLOR_TEMPLATE and object.type == "template")
-              object.status = Object.SWAP_LABELS_DASHBOARD
+              object.status = Object.METRIC_CHANGED
             end
             Storage.store_data
           rescue RestClient::BadRequest => e
