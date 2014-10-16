@@ -500,8 +500,6 @@ module Migration
               object.status = Object.IMPORTED
               Storage.store_data
 
-              pp e
-
               response = JSON.load(e.response)
               $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
             end      
@@ -596,7 +594,7 @@ module Migration
             response = JSON.load(e.response)
             $log.warn "Tagging metrics for #{object.new_project_pid}  has failed and returned 500. Reason: #{response["error"]["message"]}"
           rescue => e
-            pp e
+           
             $log.warn "Unknown error - The MAQL could not be applied on project #{object.new_project_pid} and returned 500. Reason: #{e.message}"
           end
         end
