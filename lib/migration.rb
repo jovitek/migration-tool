@@ -501,7 +501,7 @@ module Migration
               Storage.store_data
 
               response = JSON.load(e.response)
-              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
+              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: "      
             end      
           end
         end
@@ -2024,7 +2024,7 @@ module Migration
               object.status = Object.NEW
               Storage.store_data
               response = JSON.load(e.response)
-              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: #{response["error"]["message"]}"      
+              $log.warn "Unknown error - The identifier couldn't be changed and returned 500. Reason: "      
             end
         end
       end
