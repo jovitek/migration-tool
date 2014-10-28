@@ -123,7 +123,7 @@ module Migration
     end
     
     
-    def import_projects
+    def rename_domain
       inf = Time.now.inspect  + " - renaming domains"
       puts(inf)
       $log.info inf
