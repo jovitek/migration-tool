@@ -1191,9 +1191,7 @@ module Migration
                   if !report.meta.key?('locked') 
                     report.tags += " migrated_FixFilter"
                     report.save                  
-                  end
-
-                  
+                  end                  
                 end
               end
 
@@ -1222,14 +1220,12 @@ module Migration
       inf = Time.now.inspect  + " - swapping dashboard filters"
       puts(inf)
       $log.info inf
-
       connect_for_work()
       Storage.object_collection.each do |object|
         if (object.status == Object.SWAP_LABELS)
           project_pid = object.new_project_pid
           label_from = ''
           label_to = ''
-
           GoodData.use project_pid
           #start config loop here
           @settings_swap_config.each do |s|
@@ -1255,7 +1251,7 @@ module Migration
               dd.save
             end
           end
-          object.status = Object.METRIC_CHANGED
+          object.status = Object.SWAP_LABELS_DASHBOARD
           Storage.store_data
         end
       end
@@ -1273,26 +1269,29 @@ module Migration
             GoodData.use project_pid
             # read fact information
             resolution_time_fact = GoodData::Fact["fact.zendesktickets.resolutiontime"]
-            # get the fact uri
-            resolution_time_fact_uri = resolution_time_fact.uri
-            # get list of metric where resolution time fact is used 
-            metrics_array = resolution_time_fact.usedby.select {|o| o['category'] == 'metric'}
-            # iterate over array with metrics
-            metrics_array.each do |metric|
-              # get the metric obj by geting the link
-              metric_obj = GoodData.get(metric["link"])
-              # old_expression == original_metric
-              old_expression =  "[" + resolution_time_fact_uri.to_s + "]"
-              # check if the fact is in place
-              if metric_obj["metric"]["content"]["expression"].include?(old_expression)
-                # new expression == original_metric / 60
-                new_expression = old_expression + " / 60"
-                # replace the value
-                metric_obj["metric"]["content"]["expression"].gsub!(old_expression, new_expression)
-                # get the uri
-                uri = metric_obj["metric"]["meta"]["uri"]
-                # replace the resource
-                GoodData.put(uri, metric_obj)
+            # continue only if the fact exists
+            unless resolution_time_fact.nil?
+              # get the fact uri
+              resolution_time_fact_uri = resolution_time_fact.uri
+              # get list of metric where resolution time fact is used 
+              metrics_array = resolution_time_fact.usedby.select {|o| o['category'] == 'metric'}
+              # iterate over array with metrics
+              metrics_array.each do |metric|
+                # get the metric obj by geting the link
+                metric_obj = GoodData.get(metric["link"])
+                # old_expression == original_metric
+                old_expression =  "[" + resolution_time_fact_uri.to_s + "]"
+                # check if the fact is in place
+                if metric_obj["metric"]["content"]["expression"].include?(old_expression)
+                  # new expression == original_metric / 60
+                  new_expression = old_expression + " / 60"
+                  # replace the value
+                  metric_obj["metric"]["content"]["expression"].gsub!(old_expression, new_expression)
+                  # get the uri
+                  uri = metric_obj["metric"]["meta"]["uri"]
+                  # replace the resource
+                  GoodData.put(uri, metric_obj)
+                end
               end
             end
             object.status = Object.METRIC_CHANGED
@@ -1311,21 +1310,16 @@ module Migration
       inf = Time.now.inspect  + " - creating connector users"
       puts(inf)
       $log.info inf
-
-
       fail "You need to specify Zendesk domain name" if @settings_domain.nil?
       users = GoodData::Domain.users(@settings_domain)
       user_entity = users.find{|u| u.login == @settings_user_to_add}
       Storage.object_collection.each do |object|
         if (object.status == Object.METRIC_CHANGED && object.new_project_pid)
-
-
           #Get roles in current project
           project = GoodData::Project[object.new_project_pid]
           # lets find the connector role
           roles = GoodData.get("/gdc/projects/#{object.new_project_pid}/roles")
-          connectorRoleUrl = ""
-          
+          connectorRoleUrl = ""          
           roles["projectRoles"]["roles"].each do |role|
             role_response = GoodData.get(role)
             if (role_response["projectRole"]["meta"]["identifier"] == "connectorsSystemRole") 
@@ -1344,8 +1338,7 @@ module Migration
                       "self" => user_entity.json['accountSetting']['links']['self']
                   }
               }
-              }
-
+            }
           begin
             GoodData.post("/gdc/projects/#{object.new_project_pid}/users",json)
             object.status = Object.USER_CREATED
