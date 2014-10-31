@@ -387,7 +387,7 @@ module Migration
         elsif (object.status == Object.CREATED and object.type == "template")
           #Lets fake that the project was imported, because in case of template we are not importing
           #Moving directly after the Parial metada import export, because none of this task is done for template projects
-          object.status = Object.TAGGED
+          object.status = Object.FILE_UPLOAD_FINISHED
           Storage.store_data
         end
 
@@ -914,9 +914,9 @@ module Migration
         if (object.status == Object.FILE_UPLOAD_FINISHED and !@settings_color_palete.nil? and !object.new_project_pid.nil?)
           begin
             result = GoodData.put("/gdc/projects/#{object.new_project_pid}/styleSettings", @settings_color_palete)
-            if (object.status = Object.COLOR_TEMPLATE and object.type == "migration")
+            if (object.status == Object.FILE_UPLOAD_FINISHED and object.type == "migration")
               object.status = Object.COLOR_TEMPLATE
-            elsif (object.status = Object.COLOR_TEMPLATE and object.type == "template")
+            elsif (object.status == Object.FILE_UPLOAD_FINISHED and object.type == "template")
               object.status = Object.METRIC_CHANGED
             end
             Storage.store_data
