@@ -3,7 +3,7 @@ module Migration
 
   class Object
 
-    attr_accessor :rerun,:old_project_pid,:new_project_pid,:status,:export_token,:export_status_url,:token_validity,:title,:summary,:import_status_url,:maql_update_task_id,:partial_metadata_task_id,:zendesk_sync_process,:type,:upload_finished,:uploads,:api_url,:zd_account,:isFilterChecked,:hasMandatoryUserFilter,:isVariableChecked,:hasVariable,:isScheduleChecked,:hasSchedule,:old_domain,:new_domain,:metric_exists,:are_metrics_checked 
+    attr_accessor :rerun,:old_project_pid,:new_project_pid,:status,:export_token,:export_status_url,:token_validity,:title,:summary,:import_status_url,:maql_update_task_id,:partial_metadata_task_id,:zendesk_sync_process,:type,:upload_finished,:uploads,:api_url,:zd_account,:isFilterChecked,:hasMandatoryUserFilter,:isVariableChecked,:hasVariable,:isScheduleChecked,:hasSchedule,:old_domain,:new_domain,:metric_exists,:are_metrics_checked,:roleChange 
 
     def self.VALID_TYPES
       ["migration","template"]
@@ -152,6 +152,10 @@ module Migration
 
     def self.FIXED_DATE_FACTS
       "FIXED_DATE_FACTS"
+    end
+    
+    def self.USER_ROLE_CHANGED
+      "USER_ROLE_CHANGED"
     end
 
 

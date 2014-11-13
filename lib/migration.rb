@@ -1579,6 +1579,66 @@ module Migration
       end
     end
     
+    def zd3_user_role_change
+      inf = Time.now.inspect + " changing user role in Zendesk3 project"
+      $log.info inf
+      Storage.object_collection.each do |object|
+        if (object.status == Object.ENDPOINT_SET_FINISHED)
+          begin
+            # connect to ZD3 instance
+            connection = connect_for_export() 
+            # get a project pid
+            project_pid = object.old_project_pid
+            # use specific project
+            project = GoodData.use project_pid
+            # get a user list
+            user_list = project.users
+            # get profile list - initialze empty array 
+            user_list_profiles = []
+            # assign element from user list
+            user_list.each do |user|
+              # populate array with profiles IDs, except the main gooddata@zendesk.com user
+              user_list_profiles.push(user.json["user"]["links"]["self"]) unless user.json["user"]["content"]["email"] == "gooddata@zendesk.com"
+            end
+            # role resource
+            roles_resource = "/gdc/projects/#{pid}/roles/"
+            # roles 
+            roles_in_project = GoodData.get(roles_resource)
+            # roles_list
+            roles_list = roles_in_project["projectRoles"]["roles"]
+            # viewer resource
+            viewer_resource = nil
+            # iterate over
+            roles_list.each do |role|
+              # read the resource
+              resource = GoodData.get(role)
+              # assign viewer
+              viewer_resource = role if resource["projectRole"]["meta"]["title"] == "Viewer"
+            end
+            # iterate over user profiles again
+            user_list_profiles.each do |user_profile|
+              json = {
+                "associateUser" => {
+                  "user" => user_profile 
+                 }
+              }
+              # prepare resource for posting the new user role
+              resource = viewer_resource + "/users"
+              # make the change
+              user_change = GoodData.post(resource, json)
+              # change the state in case of success
+              object.roleChange = true
+              object.status = Object.USER_ROLE_CHANGED
+              Storage.store_data
+            end
+          rescue => e
+            response = JSON.load(e.response)
+            $log.warn "The user role in ZD3 project hasn't been changed. Reason: #{response["error"]["message"]}"
+          end
+        end
+      end
+    end
+    
     
     def check_variables_in_projects
       inf = Time.now.inspect + " checking variales in projects"
@@ -2287,6 +2347,8 @@ module Migration
         end
       end
     end
+    
+    
 
 
   end
