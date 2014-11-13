@@ -1601,7 +1601,7 @@ module Migration
               user_list_profiles.push(user.json["user"]["links"]["self"]) unless user.json["user"]["content"]["email"] == "gooddata@zendesk.com"
             end
             # role resource
-            roles_resource = "/gdc/projects/#{pid}/roles/"
+            roles_resource = "/gdc/projects/#{project_pid}/roles/"
             # roles 
             roles_in_project = GoodData.get(roles_resource)
             # roles_list
@@ -1632,8 +1632,7 @@ module Migration
               Storage.store_data
             end
           rescue => e
-            response = JSON.load(e.response)
-            $log.warn "The user role in ZD3 project hasn't been changed. Reason: #{response["error"]["message"]}"
+            $log.warn "The user role in ZD3 project hasn't been changed."
           end
         end
       end

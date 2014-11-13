@@ -148,6 +148,7 @@ command :start do |c|
       migration.create_integration
       migration.create_endpoint
       migration.run_integration
+      migration.zd3_user_role_change
       migration.print_status
       $log.info Time.now.inspect + ' - Migraton job ended'
       puts(Time.now.inspect + ' - Migraton job ended')
