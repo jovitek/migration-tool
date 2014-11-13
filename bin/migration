@@ -148,12 +148,28 @@ command :start do |c|
       migration.create_integration
       migration.create_endpoint
       migration.run_integration
+      migration.print_status
+      $log.info Time.now.inspect + ' - Migraton job ended'
+      puts(Time.now.inspect + ' - Migraton job ended')
+  end
+end
+
+desc 'Role Change'
+command :zd3_role_change do |c|
+  c.action do |global_options,options,args|
+      migration = Migration::MigrationTasks.new()
+      $log.info Time.now.inspect + " - Migration job started"
+      puts(Time.now.inspect + " - Migration job started")
+      migration.load_source_data
+      migration.connect_for_export
       migration.zd3_user_role_change
       migration.print_status
       $log.info Time.now.inspect + ' - Migraton job ended'
       puts(Time.now.inspect + ' - Migraton job ended')
   end
 end
+
+
 
 desc 'Migrate project'
 command :start_fix do |c|
