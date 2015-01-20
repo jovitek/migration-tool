@@ -1592,7 +1592,7 @@ module Migration
             # get obj detail
             obj = GoodData::Attribute["attr.ticketcomments.ticketcomments"]
             # Test
-            if obj != nil 
+            unless obj.nil? 
               # get the usedby array
               metrics_array = obj.usedby.select {|o| o['category'] == 'metric'}
               # check if there is any metric
