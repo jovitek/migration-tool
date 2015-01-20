@@ -1591,18 +1591,21 @@ module Migration
             GoodData.use project_pid
             # get obj detail
             obj = GoodData::Attribute["attr.ticketcomments.ticketcomments"]
-            # get the usedby array
-            metrics_array = obj.usedby.select {|o| o['category'] == 'metric'}
-            # check if there is any metric
-            if (metrics_array.count > 0)
-              object.metric_exists = true
-            else
-              object.metric_exists = false
+            # Test
+            if obj != nil 
+              # get the usedby array
+              metrics_array = obj.usedby.select {|o| o['category'] == 'metric'}
+              # check if there is any metric
+              if (metrics_array.count > 0)
+                object.metric_exists = true
+              else
+                object.metric_exists = false
+              end
+              object.are_metrics_checked = true
+              object.status = Object.TYPE_CHANGED
+              # save the file
+              Storage.store_data
             end
-            object.are_metrics_checked = true
-            object.status = Object.TYPE_CHANGED
-            # save the file
-            Storage.store_data
           rescue => e
             response = JSON.load(e.response)
             $log.warn "The update of report was not successful. Reason: #{response["error"]["message"]}"
