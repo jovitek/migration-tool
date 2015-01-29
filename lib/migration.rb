@@ -1596,7 +1596,7 @@ module Migration
               # get the usedby array
               metrics_array = obj.usedby.select {|o| o['category'] == 'metric'}
               # check if there is any metric
-              if (metrics_array.count > 0)
+              if (metrics_array.count > 0 && metrics_array.count != 12)
                 object.metric_exists = true
               else
                 object.metric_exists = false
