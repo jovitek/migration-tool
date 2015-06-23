@@ -799,8 +799,6 @@ module Migration
       puts(inf)
       $log.info inf
 
-      connect_for_work()
-
       # If we are not continuing, lets reset everything to beginning state
       Storage.object_collection.find_all{|o| o.status == Object.MAQL}.each do |object|
         object.uploads = []
@@ -1403,11 +1401,9 @@ module Migration
     
     def dummy
       Storage.object_collection.each do |object|
-        if (object.status == Object.PARTIAL)
-            #object.rerun = true
+        if (object.status == Object.NEW)
             object.new_project_pid = object.old_project_pid
-            #object.status = Object.USER_CREATED
-            object.status = Object.IMPORTED
+            object.status = Object.MAQL
         end        
         Storage.store_data
       end
@@ -2217,7 +2213,7 @@ module Migration
     end
 
 
-    def execute_partial_zd4_fix
+    def execute_partial_zd4
       inf = Time.now.inspect  + " - executing partial md import of the new dashboard"
       puts(inf)
       $log.info inf
@@ -2233,6 +2229,7 @@ module Migration
               }
           }
           begin
+            object.new_project_pid = object.old_project_pid  
             result = GoodData.post("/gdc/md/#{object.new_project_pid}/maintenance/partialmdimport", json)
             task_id = result["uri"].match(/.*\/tasks\/(.*)\/status/)[1]
             object.partial_metadata_task_id = task_id

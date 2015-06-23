@@ -20,104 +20,42 @@ desc "Debug output to STDOUT"
 switch [:d,:debug]
 
 
-desc 'Scheduled mails project'
-command :schedules_list do |c|
+# MD Partial Update command.
+# Use it in case you want to run metadata import to specified projects.
+
+desc 'Partial Update'
+command :md_partial_update do |c|
   c.action do |global_options,options,args|
       migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Scheduled job started"
-      puts(Time.now.inspect + " - Scheduled job started")
+      $log.info Time.now.inspect + " - Migration job started"
+      puts(Time.now.inspect + " - Migration job started")
       migration.load_source_data
-      migration.connect_for_export
-	  migration.check_schedules_in_projects	
+	  migration.connect_for_work
+	  migration.execute_partial_zd4
       migration.print_status
-      $log.info Time.now.inspect + ' - Scheduled job ended'
-      puts(Time.now.inspect + ' - Scheduled job ended')
+      $log.info Time.now.inspect + ' - Migraton job ended'
+      puts(Time.now.inspect + ' - Migraton job ended')
   end
 end
 
-
-
-desc 'Unlock project'
-command :unlock do |c|
+# Timeline update command.
+# Use it in case you want to run metadata import to specified projects.
+desc 'Timeline Update'
+command :timeline_update do |c|
   c.action do |global_options,options,args|
       migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Unlock job started"
-      puts(Time.now.inspect + " - Unlock job started")
+      $log.info Time.now.inspect + " - Migration job started"
+      puts(Time.now.inspect + " - Migration job started")
       migration.load_source_data
       migration.connect_for_work
-	  migration.unlocking_metric_reports	
-      migration.print_status
-      $log.info Time.now.inspect + ' - Unlock job ended'
-      puts(Time.now.inspect + ' - Unlock job ended')
-  end
-end
-
-desc 'Dummy project'
-command :dummy_run do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Sanitize job started"
-      puts(Time.now.inspect + " - Sanitize job started")
-      migration.load_source_data
       migration.dummy
+      migration.upload_file
+      migration.apply_color_template
       migration.print_status
-      $log.info Time.now.inspect + ' - Sanitize job ended'
-      puts(Time.now.inspect + ' - Sanitize job ended')
+      $log.info Time.now.inspect + ' - Timeline Upload job ended'
+      puts(Time.now.inspect + ' - Timeline Upload job ended')
   end
 end
-
-desc 'Run integrations'
-command :run_integration do |c|
-
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Sanitize job started"
-      puts(Time.now.inspect + " - Sanitize job started")
-      migration.load_source_data
-      migration.connect_for_work
-      migration.create_integration
-      migration.create_endpoint_sanitize
-      migration.run_integration
-      migration.print_status
-      $log.info Time.now.inspect + ' - Sanitize job ended'
-      puts(Time.now.inspect + ' - Sanitize job ended')
-  end
-end
-
-
-desc 'Sanitize project'
-command :sanitize do |c|
-
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Sanitize job started"
-      puts(Time.now.inspect + " - Sanitize job started")
-      migration.load_source_data
-      migration.connect_for_work
-      #migration.set_proper_status_sanitize
-      migration.execute_maql_sanitize
-      migration.load_dataset_sanitize
-      #migration.change_type_sanitize
-      migration.execute_partial_sanitize
-      migration.run_integration_sanitize
-      migration.print_status
-      $log.info Time.now.inspect + ' - Sanitize job ended'
-      puts(Time.now.inspect + ' - Sanitize job ended')
-  end
-end
-
-desc 'Export results'
-command :results do |c|
-
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Export job started"
-      puts(Time.now.inspect + " - Export job started")
-      migration.write_results      
-      puts(Time.now.inspect + ' - Export job ended')
-  end
-end
-
 
 desc 'Migrate project'
 command :start do |c|
@@ -142,56 +80,7 @@ command :start do |c|
       migration.execute_partial
       migration.swap_labels
       migration.swap_label_dash_filters
-      # this will update a value of metric when a metric with "fact.zendesktickets.resolutiontime"fact is uded
-      migration.update_of_fact_value
-      migration.create_user
-      migration.create_integration
-      migration.create_endpoint
-      migration.run_integration
-      migration.zd3_user_role_change
-      migration.print_status
-      $log.info Time.now.inspect + ' - Migraton job ended'
-      puts(Time.now.inspect + ' - Migraton job ended')
-  end
-end
-
-desc 'Role Change'
-command :zd3_role_change do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Migration job started"
-      puts(Time.now.inspect + " - Migration job started")
-      migration.load_source_data
-      migration.connect_for_export
-      migration.zd3_user_role_change
-      migration.print_status
-      $log.info Time.now.inspect + ' - Migraton job ended'
-      puts(Time.now.inspect + ' - Migraton job ended')
-  end
-end
-
-
-
-desc 'Migrate project'
-command :start_fix do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Migration job started"
-      puts(Time.now.inspect + " - Migration job started")
-      migration.load_source_data
-      migration.connect_for_work
-      migration.tag_entities
-      migration.rename_date_facts
-      migration.fix_date_facts
-      migration.execute_maql
-      migration.upload_file
-      migration.apply_color_template
-      # added method change_type (due to geomaps) before execute partial
-      migration.change_type
-      migration.execute_partial
-      migration.swap_labels
-      migration.swap_label_dash_filters
-      # this will update a value of metric when a metric with "fact.zendesktickets.resolutiontime"fact is uded
+      # this will update a value of metric when a metric with "fact.zendesktickets.resolutiontime"fact is used
       migration.update_of_fact_value
       migration.create_user
       migration.create_integration
@@ -203,105 +92,16 @@ command :start_fix do |c|
   end
 end
 
-
-desc 'Update project'
-command :update do |c|
+desc 'Export results'
+command :results do |c|
   c.action do |global_options,options,args|
       migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Unlock job started"
-      puts(Time.now.inspect + " - Unlock job started")
-      migration.load_source_data
-      migration.connect_for_work
-	    migration.execute_maql_sanitize
-	    migration.change_type_sanitize
-	    migration.execute_partial_sanitize
-      migration.print_status
-      $log.info Time.now.inspect + ' - Unlock job ended'
-      puts(Time.now.inspect + ' - Unlock job ended')
+      $log.info Time.now.inspect + " - Export job started"
+      puts(Time.now.inspect + " - Export job started")
+      migration.write_results      
+      puts(Time.now.inspect + ' - Export job ended')
   end
 end
-
-
-
-desc 'ZD4 Fix'
-command :zd4fix do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Migration job started"
-      puts(Time.now.inspect + " - Migration job started")
-      migration.load_source_data
-	  migration.connect_for_work
-	  migration.execute_partial_zd4_fix
-	  migration.execute_maql_zd4_fix
-      migration.print_status
-      $log.info Time.now.inspect + ' - Migraton job ended'
-      puts(Time.now.inspect + ' - Migraton job ended')
-  end
-end
-
-
-desc 'Check existence of any fact'
-command :fact_check do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Migration job started"
-      puts(Time.now.inspect + " - Migration job started")
-      migration.load_source_data
-	  migration.connect_for_work
-      migration.update_of_fact_value
-      migration.print_status
-      $log.info Time.now.inspect + ' - Migraton job ended'
-      puts(Time.now.inspect + ' - Migraton job ended')
-  end
-end
-
-
-desc 'Check existence of any fact'
-command :attribute_check do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Migration job started"
-      puts(Time.now.inspect + " - Migration job started")
-      migration.load_source_data
-	  migration.connect_for_work
-      migration.check_existence_of_attribute
-      migration.print_status
-      $log.info Time.now.inspect + ' - Migraton job ended'
-      puts(Time.now.inspect + ' - Migraton job ended')
-  end
-end
-
-
-desc 'ZD Rename domain'
-command :zd_rename_domain do |c|
-  c.action do |global_options,options,args|
-      migration = Migration::MigrationTasks.new()
-      $log.info Time.now.inspect + " - Migration job started"
-      puts(Time.now.inspect + " - Migration job started")
-      migration.load_source_data_for_domain_renaming
-	  migration.connect_for_export
-	  migration.rename_domain
-      migration.print_status
-      $log.info Time.now.inspect + ' - Migraton job ended'
-      puts(Time.now.inspect + ' - Migraton job ended')
-  end
-end
-
-
-desc 'Upload datasets'
-command :upload do |c|
-
-  desc "Continue"
-  switch [:c,:continue]
-
-
-  c.action do |global_options,options,args|
-    migration = Migration::MigrationTasks.new()
-    migration.upload_file(global_options[:continue])
-    migration.replace_satisfaction_values
-  end
-end
-
 
 
 pre do |global,command,options,args|
@@ -324,9 +124,6 @@ on_error do |exception|
     false
   end
 end
-
-
-
 
 exit run(ARGV)
 
