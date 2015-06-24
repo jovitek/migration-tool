@@ -1369,7 +1369,7 @@ module Migration
           begin
             json = {
                 "integration" => {
-                    "projectTemplate" => "/projectTemplates/ZendeskAnalytics/10",
+                    "projectTemplate" => @settings_project_template,
                     "active" => true
                 }
             }
@@ -2157,7 +2157,7 @@ module Migration
           }
           json2 = {
               "integration" => {
-                      "projectTemplate" => "/projectTemplates/ZendeskAnalytics/10",
+                      "projectTemplate" => @settings_project_template,
                       "active" => true
               }
           }
